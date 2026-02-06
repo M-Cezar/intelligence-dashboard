@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { StockChart } from "@/components/StockChart";
 import { 
   TrendingUp, 
   Briefcase, 
@@ -54,6 +55,9 @@ interface Ativo {
   preco: string;
   variacao: number;
   tipo: "acao" | "fii";
+  dy?: string;
+  pVP?: string;
+  data: Array<{ date: string; price: number }>;
 }
 
 const concursos: Concurso[] = [
@@ -144,12 +148,99 @@ const noticias: Noticia[] = [
   }
 ];
 
+// Função para gerar dados históricos de 1 ano
+function generateYearData(basePrice: number, ticker: string): Array<{ date: string; price: number }> {
+  const data = [];
+  const today = new Date();
+  
+  // Seed baseado no ticker para consistência
+  const seed = ticker.charCodeAt(0) + ticker.charCodeAt(1);
+  
+  for (let i = 365; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    
+    // Gerar variação pseudo-aleatória consistente
+    const randomFactor = Math.sin(seed + i * 0.1) * 0.15;
+    const trendFactor = (365 - i) / 365 * 0.2;
+    const price = basePrice * (1 + randomFactor + trendFactor);
+    
+    data.push({
+      date: date.toISOString().split('T')[0],
+      price: Math.round(price * 100) / 100
+    });
+  }
+  
+  return data;
+}
+
 const ativos: Ativo[] = [
-  { id: "1", ticker: "PETR4", nome: "Petrobras", preco: "R$ 38,50", variacao: 1.2, tipo: "acao" },
-  { id: "2", ticker: "VALE3", nome: "Vale", preco: "R$ 65,20", variacao: -0.5, tipo: "acao" },
-  { id: "3", ticker: "ITUB4", nome: "Itaú Unibanco", preco: "R$ 32,15", variacao: 0.8, tipo: "acao" },
-  { id: "4", ticker: "KNRI11", nome: "Kinea Renda Imob", preco: "R$ 162,40", variacao: 0.3, tipo: "fii" },
-  { id: "5", ticker: "HGLG11", nome: "CGHG Logística", preco: "R$ 165,10", variacao: -0.1, tipo: "fii" }
+  { 
+    id: "1", 
+    ticker: "KLBN11", 
+    nome: "Klabin", 
+    preco: "R$ 37,50", 
+    variacao: 8.5, 
+    tipo: "acao",
+    dy: "16,90%",
+    pVP: "1,20",
+    data: generateYearData(34.5, "KLBN11")
+  },
+  { 
+    id: "2", 
+    ticker: "DIRR3", 
+    nome: "Direcional", 
+    preco: "R$ 9,80", 
+    variacao: 12.3, 
+    tipo: "acao",
+    dy: "24,26%",
+    pVP: "0,95",
+    data: generateYearData(8.7, "DIRR3")
+  },
+  { 
+    id: "3", 
+    ticker: "B3SA3", 
+    nome: "B3", 
+    preco: "R$ 16,45", 
+    variacao: 5.2, 
+    tipo: "acao",
+    dy: "18,50%",
+    pVP: "1,45",
+    data: generateYearData(15.6, "B3SA3")
+  },
+  { 
+    id: "4", 
+    ticker: "BBSE3", 
+    nome: "BB Seguridade", 
+    preco: "R$ 23,10", 
+    variacao: 6.8, 
+    tipo: "acao",
+    dy: "17,80%",
+    pVP: "1,60",
+    data: generateYearData(21.6, "BBSE3")
+  },
+  { 
+    id: "5", 
+    ticker: "JSLG3", 
+    nome: "JSL", 
+    preco: "R$ 28,30", 
+    variacao: 9.1, 
+    tipo: "acao",
+    dy: "23,03%",
+    pVP: "1,29",
+    data: generateYearData(25.9, "JSLG3")
+  },
+  { 
+    id: "6", 
+    ticker: "GEPA4", 
+    nome: "Rio Paranapanema", 
+    preco: "R$ 6,20", 
+    variacao: 4.5, 
+    tipo: "acao",
+    dy: "29,19%",
+    pVP: "1,85",
+    data: generateYearData(5.9, "GEPA4")
+  }
 ];
 
 function getStatusColor(status: string) {
@@ -181,6 +272,7 @@ function getStatusLabel(status: string) {
 export default function Home() {
   const [selectedRegion, setSelectedRegion] = useState<string>("todos");
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [expandedChart, setExpandedChart] = useState<string | null>(null);
 
   const filteredConcursos = concursos.filter(c => {
     const matchRegion = selectedRegion === "todos" || c.regiao === selectedRegion;
@@ -427,14 +519,14 @@ export default function Home() {
           </TabsContent>
 
           {/* Investimentos Tab */}
-          <TabsContent value="investimentos" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
+          <TabsContent value="investimentos" className="space-y-6">
+            <div className="grid gap-6 md:grid-cols-2">
               {ativos.map((ativo) => (
                 <Card
                   key={ativo.id}
                   className="border-gray-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer group"
                 >
-                  <CardHeader className="pb-2">
+                  <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <div>
                         <CardTitle className="text-base text-gray-900">
@@ -450,28 +542,50 @@ export default function Home() {
                       </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div className="flex items-baseline justify-between">
-                        <span className="text-2xl font-bold text-gray-900">{ativo.preco}</span>
-                        <span
-                          className={`text-sm font-semibold ${
-                            ativo.variacao >= 0
-                              ? "text-emerald-600"
-                              : "text-red-600"
-                          }`}
-                        >
-                          {ativo.variacao >= 0 ? "+" : ""}{ativo.variacao}%
-                        </span>
-                      </div>
-                      <Button
-                        variant="outline"
-                        className="w-full border-gray-300 text-blue-700 hover:bg-blue-50"
+                  <CardContent className="space-y-4">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-2xl font-bold text-gray-900">{ativo.preco}</span>
+                      <span
+                        className={`text-sm font-semibold ${
+                          ativo.variacao >= 0
+                            ? "text-emerald-600"
+                            : "text-red-600"
+                        }`}
                       >
-                        <Zap className="h-4 w-4 mr-2" />
-                        Detalhes
-                      </Button>
+                        {ativo.variacao >= 0 ? "+" : ""}{ativo.variacao}%
+                      </span>
                     </div>
+
+                    {/* DY e P/VP */}
+                    {ativo.dy && (
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="bg-emerald-50 rounded p-2">
+                          <p className="text-xs text-gray-600">Dividend Yield</p>
+                          <p className="font-semibold text-emerald-700">{ativo.dy}</p>
+                        </div>
+                        <div className="bg-blue-50 rounded p-2">
+                          <p className="text-xs text-gray-600">P/VP</p>
+                          <p className="font-semibold text-blue-700">{ativo.pVP}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Gráfico */}
+                    <div className="pt-2 border-t border-gray-200">
+                      <StockChart
+                        ticker={ativo.ticker}
+                        data={ativo.data}
+                        color={ativo.variacao >= 0 ? "#10b981" : "#ef4444"}
+                      />
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      className="w-full border-gray-300 text-blue-700 hover:bg-blue-50"
+                    >
+                      <Zap className="h-4 w-4 mr-2" />
+                      Detalhes
+                    </Button>
                   </CardContent>
                 </Card>
               ))}
