@@ -16,7 +16,9 @@ import {
   DollarSign,
   Users,
   FileText,
-  Brain
+  Brain,
+  BookOpen,
+  Award
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
@@ -58,6 +60,18 @@ interface Ativo {
   dy?: string;
   pVP?: string;
   data: Array<{ date: string; price: number }>;
+}
+
+interface Curso {
+  id: string;
+  titulo: string;
+  plataforma: string;
+  area: string;
+  cargaHoraria: string;
+  certificacao: boolean;
+  regiao: string;
+  nivel: "iniciante" | "intermediario" | "avancado";
+  status: "aberto" | "previsto" | "fechado";
 }
 
 const concursos: Concurso[] = [
@@ -243,6 +257,97 @@ const ativos: Ativo[] = [
   }
 ];
 
+const cursos: Curso[] = [
+  {
+    id: "1",
+    titulo: "Liderança Estratégica com IA na Administração Pública",
+    plataforma: "Escola Virtual de Governo",
+    area: "Gestão Pública",
+    cargaHoraria: "30h",
+    certificacao: true,
+    regiao: "Federal",
+    nivel: "intermediario",
+    status: "aberto"
+  },
+  {
+    id: "2",
+    titulo: "Transformação Digital e Governo Eletrônico",
+    plataforma: "Aprenda Mais (MEC)",
+    area: "Tecnologia",
+    cargaHoraria: "40h",
+    certificacao: true,
+    regiao: "Federal",
+    nivel: "iniciante",
+    status: "aberto"
+  },
+  {
+    id: "3",
+    titulo: "Gestão de Pessoas e Desenvolvimento de Equipes",
+    plataforma: "Escola de Governo - Goiás",
+    area: "Gestão",
+    cargaHoraria: "30h",
+    certificacao: true,
+    regiao: "Goiás",
+    nivel: "intermediario",
+    status: "aberto"
+  },
+  {
+    id: "4",
+    titulo: "Direitos Humanos e Cidadania",
+    plataforma: "Escola Virtual de Governo",
+    area: "Direitos Humanos",
+    cargaHoraria: "20h",
+    certificacao: true,
+    regiao: "Federal",
+    nivel: "iniciante",
+    status: "aberto"
+  },
+  {
+    id: "5",
+    titulo: "Segurança Digital e Proteção de Dados (LGPD)",
+    plataforma: "Aprenda Mais (MEC)",
+    area: "Tecnologia",
+    cargaHoraria: "25h",
+    certificacao: true,
+    regiao: "Federal",
+    nivel: "intermediario",
+    status: "aberto"
+  },
+  {
+    id: "6",
+    titulo: "Empreendedorismo e Gestão de Negócios",
+    plataforma: "SEBRAE",
+    area: "Negócios",
+    cargaHoraria: "15h",
+    certificacao: true,
+    regiao: "Brasília",
+    nivel: "iniciante",
+    status: "aberto"
+  },
+  {
+    id: "7",
+    titulo: "Gestão de Crises no Setor Público",
+    plataforma: "Escola Virtual de Governo",
+    area: "Gestão Pública",
+    cargaHoraria: "30h",
+    certificacao: true,
+    regiao: "Federal",
+    nivel: "avancado",
+    status: "aberto"
+  },
+  {
+    id: "8",
+    titulo: "Educação Inclusiva e Acessibilidade",
+    plataforma: "EGOV Virtual - DF",
+    area: "Educação",
+    cargaHoraria: "20h",
+    certificacao: true,
+    regiao: "Brasília",
+    nivel: "iniciante",
+    status: "previsto"
+  }
+];
+
 function getStatusColor(status: string) {
   switch (status) {
     case "aberto":
@@ -273,12 +378,20 @@ export default function Home() {
   const [selectedRegion, setSelectedRegion] = useState<string>("todos");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [expandedChart, setExpandedChart] = useState<string | null>(null);
+  const [selectedCursoRegion, setSelectedCursoRegion] = useState<string>("todos");
+  const [selectedArea, setSelectedArea] = useState<string>("todas");
 
   const filteredConcursos = concursos.filter(c => {
     const matchRegion = selectedRegion === "todos" || c.regiao === selectedRegion;
     const matchSearch = c.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
                        c.orgao.toLowerCase().includes(searchTerm.toLowerCase());
     return matchRegion && matchSearch;
+  });
+
+  const filteredCursos = cursos.filter(curso => {
+    const matchRegion = selectedCursoRegion === "todos" || curso.regiao === selectedCursoRegion;
+    const matchArea = selectedArea === "todas" || curso.area === selectedArea;
+    return matchRegion && matchArea;
   });
 
   return (
@@ -293,7 +406,7 @@ export default function Home() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Intelligence Dashboard</h1>
-                <p className="text-sm text-gray-600">Concursos, IA & Investimentos</p>
+                <p className="text-sm text-gray-600">Concursos, IA, Investimentos & Cursos</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -308,7 +421,7 @@ export default function Home() {
       {/* Hero Section */}
       <section className="border-b border-gray-200 bg-white py-8">
         <div className="container mx-auto px-4">
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-4">
             <Card className="border-0 bg-gradient-to-br from-emerald-50 to-white shadow-sm hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-emerald-700">
@@ -347,6 +460,19 @@ export default function Home() {
                 <p className="text-sm text-gray-600 mt-1">Ativos monitorados</p>
               </CardContent>
             </Card>
+
+            <Card className="border-0 bg-gradient-to-br from-purple-50 to-white shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-purple-700">
+                  <BookOpen className="h-5 w-5" />
+                  Cursos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-gray-900">{filteredCursos.length}</div>
+                <p className="text-sm text-gray-600 mt-1">Cursos com certificado</p>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
@@ -354,7 +480,7 @@ export default function Home() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="concursos" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1">
+          <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1">
             <TabsTrigger value="concursos" className="flex items-center gap-2">
               <Briefcase className="h-4 w-4" />
               Concursos
@@ -366,6 +492,10 @@ export default function Home() {
             <TabsTrigger value="investimentos" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               Investimentos
+            </TabsTrigger>
+            <TabsTrigger value="cursos" className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4" />
+              Cursos
             </TabsTrigger>
           </TabsList>
 
@@ -585,6 +715,98 @@ export default function Home() {
                     >
                       <Zap className="h-4 w-4 mr-2" />
                       Detalhes
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          {/* Cursos Tab */}
+          <TabsContent value="cursos" className="space-y-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex-1" />
+              <div className="flex gap-2">
+                <Button
+                  variant={selectedCursoRegion === "todos" ? "default" : "outline"}
+                  onClick={() => setSelectedCursoRegion("todos")}
+                  className="gap-2"
+                >
+                  <Filter className="h-4 w-4" />
+                  Todos
+                </Button>
+                <Button
+                  variant={selectedCursoRegion === "Federal" ? "default" : "outline"}
+                  onClick={() => setSelectedCursoRegion("Federal")}
+                >
+                  Federal
+                </Button>
+                <Button
+                  variant={selectedCursoRegion === "Goiás" ? "default" : "outline"}
+                  onClick={() => setSelectedCursoRegion("Goiás")}
+                >
+                  GO
+                </Button>
+                <Button
+                  variant={selectedCursoRegion === "Brasília" ? "default" : "outline"}
+                  onClick={() => setSelectedCursoRegion("Brasília")}
+                >
+                  DF
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              {filteredCursos.map((curso) => (
+                <Card
+                  key={curso.id}
+                  className="border-gray-200 hover:border-purple-300 hover:shadow-md transition-all cursor-pointer group"
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="text-lg text-gray-900 group-hover:text-purple-700 transition-colors">
+                          {curso.titulo}
+                        </CardTitle>
+                        <CardDescription className="mt-1 text-gray-600">
+                          {curso.plataforma}
+                        </CardDescription>
+                      </div>
+                      <Badge className="bg-purple-100 text-purple-800 border-purple-300 border">
+                        {curso.status === "aberto" ? "Aberto" : "Previsto"}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-3 md:grid-cols-3 mb-4">
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="h-4 w-4 text-gray-400" />
+                        <div>
+                          <p className="text-xs text-gray-600">Area</p>
+                          <p className="font-semibold text-gray-900 text-sm">{curso.area}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-gray-400" />
+                        <div>
+                          <p className="text-xs text-gray-600">Carga Horária</p>
+                          <p className="font-semibold text-gray-900 text-sm">{curso.cargaHoraria}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Award className="h-4 w-4 text-gray-400" />
+                        <div>
+                          <p className="text-xs text-gray-600">Certificado</p>
+                          <p className="font-semibold text-gray-900 text-sm">Sim</p>
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-between text-purple-700 hover:bg-purple-50"
+                    >
+                      Inscrever-se
+                      <ChevronRight className="h-4 w-4" />
                     </Button>
                   </CardContent>
                 </Card>
