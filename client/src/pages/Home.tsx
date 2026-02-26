@@ -821,6 +821,7 @@ export default function Home() {
         <div className="container mx-auto px-4 text-center text-sm text-gray-600">
           <p>Dashboard de Inteligência e Oportunidades • Dados atualizados em tempo real</p>
           <p className="mt-2">Desenvolvido com ❤️ para ajudar você a tomar melhores decisões</p>
+          <p className="mt-3 text-xs text-gray-500">Feito por Manus e Cézar</p>
         </div>
       </footer>
     </div>
