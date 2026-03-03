@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { StockChart } from "@/components/StockChart";
+import { useLocation } from "wouter";
 import { 
   TrendingUp, 
   Briefcase, 
@@ -375,6 +376,7 @@ function getStatusLabel(status: string) {
 }
 
 export default function Home() {
+  const [, navigate] = useLocation();
   const [selectedRegion, setSelectedRegion] = useState<string>("todos");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [expandedChart, setExpandedChart] = useState<string | null>(null);
@@ -598,6 +600,7 @@ export default function Home() {
                     <Button
                       variant="ghost"
                       className="mt-4 w-full justify-between text-blue-700 hover:bg-blue-50"
+                      onClick={() => navigate(`/concurso/${concurso.id}`)}
                     >
                       Ver detalhes
                       <ChevronRight className="h-4 w-4" />
@@ -637,7 +640,7 @@ export default function Home() {
                   <CardContent>
                     <div className="flex items-center justify-between">
                       <p className="text-sm text-gray-600">Fonte: <span className="font-semibold">{noticia.fonte}</span></p>
-                      <Button variant="ghost" className="text-blue-700 hover:bg-blue-50 gap-2">
+                      <Button variant="ghost" className="text-blue-700 hover:bg-blue-50 gap-2" onClick={() => navigate(`/noticia/${noticia.id}`)}>
                         Ler mais
                         <ChevronRight className="h-4 w-4" />
                       </Button>
@@ -712,6 +715,7 @@ export default function Home() {
                     <Button
                       variant="outline"
                       className="w-full border-gray-300 text-blue-700 hover:bg-blue-50"
+                      onClick={() => navigate(`/acao/${ativo.id}`)}
                     >
                       <Zap className="h-4 w-4 mr-2" />
                       Detalhes
@@ -804,6 +808,7 @@ export default function Home() {
                     <Button
                       variant="ghost"
                       className="w-full justify-between text-purple-700 hover:bg-purple-50"
+                      onClick={() => navigate(`/curso/${curso.id}`)}
                     >
                       Inscrever-se
                       <ChevronRight className="h-4 w-4" />
