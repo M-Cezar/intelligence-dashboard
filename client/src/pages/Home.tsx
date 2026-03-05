@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -376,6 +377,10 @@ function getStatusLabel(status: string) {
 }
 
 export default function Home() {
+  // The userAuth hooks provides authentication state
+  // To implement login/logout functionality, simply call logout() or redirect to getLoginUrl()
+  let { user, loading, error, isAuthenticated, logout } = useAuth();
+
   const [, navigate] = useLocation();
   const [selectedRegion, setSelectedRegion] = useState<string>("todos");
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -411,7 +416,21 @@ export default function Home() {
                 <p className="text-sm text-gray-600">Concursos, IA, Investimentos & Cursos</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-4">
+              {isAuthenticated && user && (
+                <div className="text-sm text-gray-700">
+                  Bem-vindo, <span className="font-semibold">{user.name || user.email}</span>
+                </div>
+              )}
+              {isAuthenticated ? (
+                <Button variant="outline" size="sm" onClick={logout}>
+                  Sair
+                </Button>
+              ) : (
+                <Button size="sm" onClick={() => window.location.href = '/api/oauth/login'}>
+                  Entrar
+                </Button>
+              )}
               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
                 Atualizado hoje
               </Badge>
