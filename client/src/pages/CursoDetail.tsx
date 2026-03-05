@@ -138,7 +138,11 @@ export default function CursoDetail() {
             </div>
 
             <div className="pt-4 border-t">
-              <Button size="lg" className="w-full bg-blue-600 hover:bg-blue-700">
+              <Button 
+                size="lg" 
+                className="w-full bg-blue-600 hover:bg-blue-700"
+                onClick={() => window.open(curso.linkInscricao, '_blank')}
+              >
                 <ExternalLink className="w-4 h-4 mr-2" />
                 Inscrever-se Agora
               </Button>

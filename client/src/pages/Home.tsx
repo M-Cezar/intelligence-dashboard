@@ -74,6 +74,7 @@ interface Curso {
   regiao: string;
   nivel: "iniciante" | "intermediario" | "avancado";
   status: "aberto" | "previsto" | "fechado";
+  linkInscricao?: string;
 }
 
 const concursos: Concurso[] = [
@@ -269,7 +270,8 @@ const cursos: Curso[] = [
     certificacao: true,
     regiao: "Federal",
     nivel: "intermediario",
-    status: "aberto"
+    status: "aberto",
+    linkInscricao: "https://www.escolavirtual.gov.br/catalogo"
   },
   {
     id: "2",
@@ -280,7 +282,8 @@ const cursos: Curso[] = [
     certificacao: true,
     regiao: "Federal",
     nivel: "iniciante",
-    status: "aberto"
+    status: "aberto",
+    linkInscricao: "https://aprendamais.mec.gov.br/"
   },
   {
     id: "3",
@@ -291,7 +294,8 @@ const cursos: Curso[] = [
     certificacao: true,
     regiao: "Goiás",
     nivel: "intermediario",
-    status: "aberto"
+    status: "aberto",
+    linkInscricao: "https://goias.gov.br/escoladegoverno/cursos-ead/"
   },
   {
     id: "4",
@@ -302,7 +306,8 @@ const cursos: Curso[] = [
     certificacao: true,
     regiao: "Federal",
     nivel: "iniciante",
-    status: "aberto"
+    status: "aberto",
+    linkInscricao: "https://www.escolavirtual.gov.br/catalogo"
   },
   {
     id: "5",
@@ -313,7 +318,8 @@ const cursos: Curso[] = [
     certificacao: true,
     regiao: "Federal",
     nivel: "intermediario",
-    status: "aberto"
+    status: "aberto",
+    linkInscricao: "https://aprendamais.mec.gov.br/"
   },
   {
     id: "6",
@@ -324,7 +330,8 @@ const cursos: Curso[] = [
     certificacao: true,
     regiao: "Brasília",
     nivel: "iniciante",
-    status: "aberto"
+    status: "aberto",
+    linkInscricao: "https://www.sebrae.com.br/sites/PortalSebrae/cursos"
   },
   {
     id: "7",
@@ -335,7 +342,8 @@ const cursos: Curso[] = [
     certificacao: true,
     regiao: "Federal",
     nivel: "avancado",
-    status: "aberto"
+    status: "aberto",
+    linkInscricao: "https://www.escolavirtual.gov.br/catalogo"
   },
   {
     id: "8",
@@ -346,7 +354,8 @@ const cursos: Curso[] = [
     certificacao: true,
     regiao: "Brasília",
     nivel: "iniciante",
-    status: "previsto"
+    status: "previsto",
+    linkInscricao: "https://egovvirtual.df.gov.br/"
   }
 ];
 
