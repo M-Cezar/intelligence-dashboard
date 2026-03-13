@@ -1,25 +1,28 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
 import { InsertUser, users } from "../drizzle/schema";
-import { ENV } from './_core/env';
+import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
-  if (!process.env.DATABASE_URL) {
-  console.warn("DATABASE_URL not set");
-}
-    try {
-      _db import mysql from "mysql2/promise";
+  if (_db) return _db;
 
-const pool = mysql.createPool(process.env.DATABASE_URL);
-const db = drizzle(pool);
-    } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
-      _db = null;
-    }
+  if (!ENV.databaseUrl) {
+    console.warn("[Database] DATABASE_URL not set");
+    return null;
   }
+
+  try {
+    const pool = mysql.createPool(ENV.databaseUrl);
+    _db = drizzle(pool);
+  } catch (error) {
+    console.warn("[Database] Failed to connect:", error);
+    _db = null;
+  }
+
   return _db;
 }
 
