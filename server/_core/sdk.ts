@@ -39,7 +39,7 @@ class OAuthService {
   }
 
   private decodeState(state: string): string {
-    const redirectUri = atob(state);
+    const redirectUri = Buffer.from(state, "base64").toString("utf-8");
     return redirectUri;
   }
 
