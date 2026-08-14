@@ -4,15 +4,7 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-"scripts": {
-  "dev": "cross-env NODE_ENV=development tsx watch server/_core/index.ts",
-  "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
-  "start": "NODE_ENV=production node dist/index.js",
-  "check": "tsc --noEmit",
-  "format": "prettier --write .",
-  "test": "vitest run",
-  "db:push": "drizzle-kit generate && drizzle-kit migrate"
-}
+    "dev": "cross-env NODE_ENV=development tsx watch server/_core/index.ts",
     "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
@@ -59,7 +51,6 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "cookie": "^1.0.2",
-
     "cross-env": "^10.1.0",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.2",
