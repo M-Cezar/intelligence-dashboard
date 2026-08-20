@@ -47,10 +47,21 @@ jobs:
           old = '''              {isAuthenticated ? (\n                <Button variant="outline" size="sm" onClick={logout}>\n                  Sair\n                </Button>\n              ) : (\n                <Button size="sm" onClick={() => window.location.href = '/api/oauth/login'}>\n                  Entrar\n                </Button>\n              )}'''
           new = '''              {!isNative && (isAuthenticated ? (\n                <Button variant="outline" size="sm" onClick={logout}>\n                  Sair\n                </Button>\n              ) : (\n                <Button size="sm" onClick={() => window.location.href = '/api/oauth/login'}>\n                  Entrar\n                </Button>\n              ))}'''
           text = text.replace(old, new)
-          text = text.replace('Atualizado hoje', 'Base local')
-          text = text.replace('Concursos disponíveis', 'Concursos na base')
-          text = text.replace('Notícias recentes', 'Notícias na base')
-          text = text.replace('Ativos monitorados', 'Ativos na base')
+          replacements = {
+              'Atualizado hoje': 'Base local',
+              'Concursos disponíveis': 'Concursos na base',
+              'Notícias recentes': 'Notícias na base',
+              'Ativos monitorados': 'Ativos na base',
+              'Dados atualizados em tempo real': 'Base local para validação; confirme dados nas fontes oficiais',
+              'Desenvolvido com ❤️ para ajudar você a tomar melhores decisões': 'Centralização de informações para consulta e análise',
+              '<p className="text-xs text-gray-600">Area</p>': '<p className="text-xs text-gray-600">Área</p>',
+              '                      Inscrever-se\n': '                      Ver detalhes\n',
+              'data: "Hoje"': 'data: "Base local"',
+              'data: "Ontem"': 'data: "Base local"',
+              'data: "2 dias atrás"': 'data: "Base local"',
+          }
+          for old_text, new_text in replacements.items():
+              text = text.replace(old_text, new_text)
           path.write_text(text)
           PY
 
