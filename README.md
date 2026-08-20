@@ -1,0 +1,1 @@
+Projeto de ideia inicial para suprir a falta de tempo em pesquisar item por item. reunir tudo isso em um só local parece me que deu certo. dai acabou escalando, ainda em testes. Logo vem algo novo por ai
