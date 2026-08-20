@@ -55,7 +55,7 @@ export function useAuth(options?: UseAuthOptions) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      localStorage.setItem("manus-runtime-user-info", JSON.stringify(state.user));
+      localStorage.setItem("intelligence-dashboard-user", JSON.stringify(state.user));
     } catch {
       // Storage can be unavailable in restricted browser contexts; auth must still work.
     }
