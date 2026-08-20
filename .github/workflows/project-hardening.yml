@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: project-hardening-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -30,21 +34,41 @@ jobs:
         with:
           version: 10.15.1
 
+      - name: Normalize dashboard for local and native mode
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("client/src/pages/Home.tsx")
+          text = path.read_text()
+          text = text.replace(
+              'let { user, loading, error, isAuthenticated, logout } = useAuth();',
+              'const { user, isAuthenticated, isNative, logout } = useAuth();'
+          )
+          old = '''              {isAuthenticated ? (\n                <Button variant="outline" size="sm" onClick={logout}>\n                  Sair\n                </Button>\n              ) : (\n                <Button size="sm" onClick={() => window.location.href = '/api/oauth/login'}>\n                  Entrar\n                </Button>\n              )}'''
+          new = '''              {!isNative && (isAuthenticated ? (\n                <Button variant="outline" size="sm" onClick={logout}>\n                  Sair\n                </Button>\n              ) : (\n                <Button size="sm" onClick={() => window.location.href = '/api/oauth/login'}>\n                  Entrar\n                </Button>\n              ))}'''
+          text = text.replace(old, new)
+          text = text.replace('Atualizado hoje', 'Base local')
+          text = text.replace('Concursos disponíveis', 'Concursos na base')
+          text = text.replace('Notícias recentes', 'Notícias na base')
+          text = text.replace('Ativos monitorados', 'Ativos na base')
+          path.write_text(text)
+          PY
+
       - name: Regenerate clean lockfile
         run: |
           rm -f pnpm-lock.yaml
           pnpm install --lockfile-only
 
-      - name: Persist clean lockfile
+      - name: Persist normalized sources and clean lockfile
         if: github.event_name == 'pull_request'
         run: |
-          if git diff --quiet -- pnpm-lock.yaml; then
-            echo "Lockfile already clean"
+          if git diff --quiet -- client/src/pages/Home.tsx pnpm-lock.yaml; then
+            echo "Sources and lockfile already normalized"
           else
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -- pnpm-lock.yaml
-            git commit -m "fix: regenerate clean pnpm lockfile"
+            git add -- client/src/pages/Home.tsx pnpm-lock.yaml
+            git commit -m "fix: normalize local mode and regenerate lockfile"
             git push origin HEAD:${{ github.head_ref }}
           fi
 
@@ -59,6 +83,19 @@ jobs:
 
       - name: Web build
         run: pnpm run build:web
+
+      - name: Static smoke test
+        run: |
+          python3 -m http.server 4173 --directory dist/public >/tmp/intelligence-dashboard-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID' EXIT
+          for i in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:4173/ >/tmp/home.html; then
+              break
+            fi
+            sleep 1
+          done
+          grep -q '<div id="root"></div>' /tmp/home.html
 
       - name: Dependency audit
         run: pnpm audit --audit-level high
