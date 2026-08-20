@@ -1,9 +1,9 @@
-import { AXIOS_TIMEOUT_MS, COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { ForbiddenError } from "@shared/_core/errors";
+import { AXIOS_TIMEOUT_MS, COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import axios, { type AxiosInstance } from "axios";
 import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
-import { SignJWT, jwtVerify } from "jose";
+import { jwtVerify, SignJWT } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { ENV } from "./env";
@@ -14,7 +14,7 @@ import type {
   GetUserInfoWithJwtRequest,
   GetUserInfoWithJwtResponse,
 } from "./types/manusTypes";
-// Utility function
+
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
 
@@ -24,29 +24,29 @@ export type SessionPayload = {
   name: string;
 };
 
-const EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
-const GET_USER_INFO_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfo`;
-const GET_USER_INFO_WITH_JWT_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfoWithJwt`;
+const EXCHANGE_TOKEN_PATH = "/webdev.v1.WebDevAuthPublicService/ExchangeToken";
+const GET_USER_INFO_PATH = "/webdev.v1.WebDevAuthPublicService/GetUserInfo";
+const GET_USER_INFO_WITH_JWT_PATH = "/webdev.v1.WebDevAuthPublicService/GetUserInfoWithJwt";
 
 class OAuthService {
   constructor(private client: ReturnType<typeof axios.create>) {
-    console.log("[OAuth] Initialized with baseURL:", ENV.oAuthServerUrl);
     if (!ENV.oAuthServerUrl) {
-      console.error(
-        "[OAuth] ERROR: OAUTH_SERVER_URL is not configured! Set OAUTH_SERVER_URL environment variable."
-      );
+      console.warn("[OAuth] OAUTH_SERVER_URL is not configured");
     }
   }
 
   private decodeState(state: string): string {
-    const redirectUri = Buffer.from(state, "base64").toString("utf-8");
-    return redirectUri;
+    return Buffer.from(state, "base64").toString("utf-8");
   }
 
-  async getTokenByCode(
-    code: string,
-    state: string
-  ): Promise<ExchangeTokenResponse> {
+  async getTokenByCode(code: string, state: string): Promise<ExchangeTokenResponse> {
+    if (!ENV.appId) {
+      throw new Error("VITE_APP_ID is required for OAuth");
+    }
+    if (!ENV.oAuthServerUrl) {
+      throw new Error("OAUTH_SERVER_URL is required for OAuth");
+    }
+
     const payload: ExchangeTokenRequest = {
       clientId: ENV.appId,
       grantType: "authorization_code",
@@ -54,31 +54,21 @@ class OAuthService {
       redirectUri: this.decodeState(state),
     };
 
-    const { data } = await this.client.post<ExchangeTokenResponse>(
-      EXCHANGE_TOKEN_PATH,
-      payload
-    );
-
+    const { data } = await this.client.post<ExchangeTokenResponse>(EXCHANGE_TOKEN_PATH, payload);
     return data;
   }
 
-  async getUserInfoByToken(
-    token: ExchangeTokenResponse
-  ): Promise<GetUserInfoResponse> {
-    const { data } = await this.client.post<GetUserInfoResponse>(
-      GET_USER_INFO_PATH,
-      {
-        accessToken: token.accessToken,
-      }
-    );
-
+  async getUserInfoByToken(token: ExchangeTokenResponse): Promise<GetUserInfoResponse> {
+    const { data } = await this.client.post<GetUserInfoResponse>(GET_USER_INFO_PATH, {
+      accessToken: token.accessToken,
+    });
     return data;
   }
 }
 
 const createOAuthHttpClient = (): AxiosInstance =>
   axios.create({
-    baseURL: ENV.oAuthServerUrl,
+    baseURL: ENV.oAuthServerUrl || undefined,
     timeout: AXIOS_TIMEOUT_MS,
   });
 
@@ -97,47 +87,34 @@ class SDKServer {
   ): string | null {
     if (fallback && fallback.length > 0) return fallback;
     if (!Array.isArray(platforms) || platforms.length === 0) return null;
+
     const set = new Set<string>(
-      platforms.filter((p): p is string => typeof p === "string")
+      platforms.filter((platform): platform is string => typeof platform === "string")
     );
+
     if (set.has("REGISTERED_PLATFORM_EMAIL")) return "email";
     if (set.has("REGISTERED_PLATFORM_GOOGLE")) return "google";
     if (set.has("REGISTERED_PLATFORM_APPLE")) return "apple";
-    if (
-      set.has("REGISTERED_PLATFORM_MICROSOFT") ||
-      set.has("REGISTERED_PLATFORM_AZURE")
-    )
+    if (set.has("REGISTERED_PLATFORM_MICROSOFT") || set.has("REGISTERED_PLATFORM_AZURE")) {
       return "microsoft";
+    }
     if (set.has("REGISTERED_PLATFORM_GITHUB")) return "github";
+
     const first = Array.from(set)[0];
     return first ? first.toLowerCase() : null;
   }
 
-  /**
-   * Exchange OAuth authorization code for access token
-   * @example
-   * const tokenResponse = await sdk.exchangeCodeForToken(code, state);
-   */
-  async exchangeCodeForToken(
-    code: string,
-    state: string
-  ): Promise<ExchangeTokenResponse> {
+  async exchangeCodeForToken(code: string, state: string): Promise<ExchangeTokenResponse> {
     return this.oauthService.getTokenByCode(code, state);
   }
 
-  /**
-   * Get user information using access token
-   * @example
-   * const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
-   */
   async getUserInfo(accessToken: string): Promise<GetUserInfoResponse> {
-    const data = await this.oauthService.getUserInfoByToken({
-      accessToken,
-    } as ExchangeTokenResponse);
+    const data = await this.oauthService.getUserInfoByToken({ accessToken } as ExchangeTokenResponse);
     const loginMethod = this.deriveLoginMethod(
       (data as any)?.platforms,
       (data as any)?.platform ?? data.platform ?? null
     );
+
     return {
       ...(data as any),
       platform: loginMethod,
@@ -146,33 +123,34 @@ class SDKServer {
   }
 
   private parseCookies(cookieHeader: string | undefined) {
-    if (!cookieHeader) {
-      return new Map<string, string>();
-    }
-
-    const parsed = parseCookieHeader(cookieHeader);
-    return new Map(Object.entries(parsed));
+    if (!cookieHeader) return new Map<string, string>();
+    return new Map(Object.entries(parseCookieHeader(cookieHeader)));
   }
 
   private getSessionSecret() {
     const secret = ENV.cookieSecret;
+    if (!secret || secret.length < 32) {
+      throw new Error("JWT_SECRET must be configured with at least 32 characters");
+    }
     return new TextEncoder().encode(secret);
   }
 
-  /**
-   * Create a session token for a Manus user openId
-   * @example
-   * const sessionToken = await sdk.createSessionToken(userInfo.openId);
-   */
   async createSessionToken(
     openId: string,
     options: { expiresInMs?: number; name?: string } = {}
   ): Promise<string> {
+    if (!isNonEmptyString(openId)) {
+      throw new Error("openId is required to create a session");
+    }
+    if (!isNonEmptyString(ENV.appId)) {
+      throw new Error("VITE_APP_ID is required to create a session");
+    }
+
     return this.signSession(
       {
         openId,
         appId: ENV.appId,
-        name: options.name || "",
+        name: options.name ?? "",
       },
       options
     );
@@ -182,6 +160,10 @@ class SDKServer {
     payload: SessionPayload,
     options: { expiresInMs?: number } = {}
   ): Promise<string> {
+    if (!isNonEmptyString(payload.openId) || !isNonEmptyString(payload.appId)) {
+      throw new Error("Session requires a valid openId and appId");
+    }
+
     const issuedAt = Date.now();
     const expiresInMs = options.expiresInMs ?? ONE_YEAR_MS;
     const expirationSeconds = Math.floor((issuedAt + expiresInMs) / 1000);
@@ -190,9 +172,10 @@ class SDKServer {
     return new SignJWT({
       openId: payload.openId,
       appId: payload.appId,
-      name: payload.name,
+      name: payload.name ?? "",
     })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+      .setIssuedAt(Math.floor(issuedAt / 1000))
       .setExpirationTime(expirationSeconds)
       .sign(secretKey);
   }
@@ -200,10 +183,7 @@ class SDKServer {
   async verifySession(
     cookieValue: string | undefined | null
   ): Promise<{ openId: string; appId: string; name: string } | null> {
-    if (!cookieValue) {
-      console.warn("[Auth] Missing session cookie");
-      return null;
-    }
+    if (!cookieValue) return null;
 
     try {
       const secretKey = this.getSessionSecret();
@@ -215,26 +195,21 @@ class SDKServer {
       if (
         !isNonEmptyString(openId) ||
         !isNonEmptyString(appId) ||
-        !isNonEmptyString(name)
+        typeof name !== "string" ||
+        (ENV.appId && appId !== ENV.appId)
       ) {
-        console.warn("[Auth] Session payload missing required fields");
+        console.warn("[Auth] Invalid session payload");
         return null;
       }
 
-      return {
-        openId,
-        appId,
-        name,
-      };
+      return { openId, appId, name };
     } catch (error) {
       console.warn("[Auth] Session verification failed", String(error));
       return null;
     }
   }
 
-  async getUserInfoWithJwt(
-    jwtToken: string
-  ): Promise<GetUserInfoWithJwtResponse> {
+  async getUserInfoWithJwt(jwtToken: string): Promise<GetUserInfoWithJwtResponse> {
     const payload: GetUserInfoWithJwtRequest = {
       jwtToken,
       projectId: ENV.appId,
@@ -249,6 +224,7 @@ class SDKServer {
       (data as any)?.platforms,
       (data as any)?.platform ?? data.platform ?? null
     );
+
     return {
       ...(data as any),
       platform: loginMethod,
@@ -257,7 +233,6 @@ class SDKServer {
   }
 
   async authenticateRequest(req: Request): Promise<User> {
-    // Regular authentication flow
     const cookies = this.parseCookies(req.headers.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);
     const session = await this.verifySession(sessionCookie);
@@ -266,11 +241,9 @@ class SDKServer {
       throw ForbiddenError("Invalid session cookie");
     }
 
-    const sessionUserId = session.openId;
     const signedInAt = new Date();
-    let user = await db.getUserByOpenId(sessionUserId);
+    let user = await db.getUserByOpenId(session.openId);
 
-    // If user not in DB, sync from OAuth server automatically
     if (!user) {
       try {
         const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
