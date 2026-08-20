@@ -65,4 +65,4 @@ jobs:
           grep -q '<div id="root"></div>' /tmp/home.html
 
       - name: Dependency audit
-        run: pnpm audit --audit-level high
+        run: pnpm audit --audit-level moderate
