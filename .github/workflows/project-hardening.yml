@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: project-hardening-${{ github.event.pull_request.number || github.ref }}
@@ -20,12 +20,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@5
         with:
           node-version: 22
 
@@ -34,69 +32,11 @@ jobs:
         with:
           version: 10.15.1
 
-      - name: Normalize dashboard for local and native mode
+      - name: Reject unresolved merge markers
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path("client/src/pages/Home.tsx")
-          text = path.read_text()
-          text = text.replace(
-              'let { user, loading, error, isAuthenticated, logout } = useAuth();',
-              'const { user, isAuthenticated, isNative, logout } = useAuth();'
-          )
-          old = '''              {isAuthenticated ? (\n                <Button variant="outline" size="sm" onClick={logout}>\n                  Sair\n                </Button>\n              ) : (\n                <Button size="sm" onClick={() => window.location.href = '/api/oauth/login'}>\n                  Entrar\n                </Button>\n              )}'''
-          new = '''              {!isNative && (isAuthenticated ? (\n                <Button variant="outline" size="sm" onClick={logout}>\n                  Sair\n                </Button>\n              ) : (\n                <Button size="sm" onClick={() => window.location.href = '/api/oauth/login'}>\n                  Entrar\n                </Button>\n              ))}'''
-          text = text.replace(old, new)
-          replacements = {
-              'Atualizado hoje': 'Base local',
-              'Concursos disponíveis': 'Concursos na base',
-              'Notícias recentes': 'Notícias na base',
-              'Ativos monitorados': 'Ativos na base',
-              'Dados atualizados em tempo real': 'Base local para validação; confirme dados nas fontes oficiais',
-              'Desenvolvido com ❤️ para ajudar você a tomar melhores decisões': 'Centralização de informações para consulta e análise',
-              '<p className="text-xs text-gray-600">Area</p>': '<p className="text-xs text-gray-600">Área</p>',
-              '                      Inscrever-se\n': '                      Ver detalhes\n',
-              'data: "Hoje"': 'data: "Base local"',
-              'data: "Ontem"': 'data: "Base local"',
-              'data: "2 dias atrás"': 'data: "Base local"',
-          }
-          for old_text, new_text in replacements.items():
-              text = text.replace(old_text, new_text)
-
-          text = text.replace(
-              '          <div className="flex items-center justify-between">',
-              '          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">',
-              1,
-          )
-          text = text.replace(
-              '            <div className="flex items-center gap-4">',
-              '            <div className="flex flex-wrap items-center gap-2 sm:gap-4">',
-              1,
-          )
-          text = text.replace('className="flex gap-2"', 'className="flex flex-wrap gap-2"')
-          text = text.replace(
-              '''              {isAuthenticated && user && (\n                <div className="text-sm text-gray-700">\n                  Bem-vindo, <span className="font-semibold">{user.name || user.email}</span>\n                </div>\n              )}''',
-              '''              {isNative ? (\n                <div className="text-sm font-semibold text-gray-700">Modo local</div>\n              ) : isAuthenticated && user ? (\n                <div className="text-sm text-gray-700">\n                  Bem-vindo, <span className="font-semibold">{user.name || user.email}</span>\n                </div>\n              ) : null}''',
-          )
-          path.write_text(text)
-          PY
-
-      - name: Regenerate clean lockfile
-        run: |
-          rm -f pnpm-lock.yaml
-          pnpm install --lockfile-only
-
-      - name: Persist normalized sources and clean lockfile
-        if: github.event_name == 'pull_request'
-        run: |
-          if git diff --quiet -- client/src/pages/Home.tsx pnpm-lock.yaml; then
-            echo "Sources and lockfile already normalized"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -- client/src/pages/Home.tsx pnpm-lock.yaml
-            git commit -m "fix: normalize local mode and regenerate lockfile"
-            git push origin HEAD:${{ github.head_ref }}
+          if grep -R -nE '^(<<<<<<< |>>>>>>> )' --exclude-dir=.git .; then
+            echo "Unresolved Git merge markers found"
+            exit 1
           fi
 
       - name: Install dependencies
@@ -126,10 +66,3 @@ jobs:
 
       - name: Dependency audit
         run: pnpm audit --audit-level high
-
-      - name: Upload regenerated lockfile
-        uses: actions/upload-artifact@v4
-        with:
-          name: clean-pnpm-lock
-          path: pnpm-lock.yaml
-          if-no-files-found: error
