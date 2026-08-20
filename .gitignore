@@ -6,6 +6,7 @@
 dist/
 build/
 *.dist
+/android/
 
 # Environment variables
 .env
