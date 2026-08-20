@@ -3,6 +3,7 @@ name: Android APK
 on:
   push:
     branches:
+      - main
       - fix/package-json-scripts
   pull_request:
     branches:
