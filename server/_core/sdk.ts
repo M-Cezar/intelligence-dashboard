@@ -13,7 +13,7 @@ import type {
   GetUserInfoResponse,
   GetUserInfoWithJwtRequest,
   GetUserInfoWithJwtResponse,
-} from "./types/manusTypes";
+} from "./types/authTypes";
 
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
@@ -40,12 +40,8 @@ class OAuthService {
   }
 
   async getTokenByCode(code: string, state: string): Promise<ExchangeTokenResponse> {
-    if (!ENV.appId) {
-      throw new Error("VITE_APP_ID is required for OAuth");
-    }
-    if (!ENV.oAuthServerUrl) {
-      throw new Error("OAUTH_SERVER_URL is required for OAuth");
-    }
+    if (!ENV.appId) throw new Error("VITE_APP_ID is required for OAuth");
+    if (!ENV.oAuthServerUrl) throw new Error("OAUTH_SERVER_URL is required for OAuth");
 
     const payload: ExchangeTokenRequest = {
       clientId: ENV.appId,
@@ -66,11 +62,10 @@ class OAuthService {
   }
 }
 
-const createOAuthHttpClient = (): AxiosInstance =>
-  axios.create({
-    baseURL: ENV.oAuthServerUrl || undefined,
-    timeout: AXIOS_TIMEOUT_MS,
-  });
+const createOAuthHttpClient = (): AxiosInstance => axios.create({
+  baseURL: ENV.oAuthServerUrl || undefined,
+  timeout: AXIOS_TIMEOUT_MS,
+});
 
 class SDKServer {
   private readonly client: AxiosInstance;
@@ -81,25 +76,15 @@ class SDKServer {
     this.oauthService = new OAuthService(this.client);
   }
 
-  private deriveLoginMethod(
-    platforms: unknown,
-    fallback: string | null | undefined
-  ): string | null {
+  private deriveLoginMethod(platforms: unknown, fallback: string | null | undefined): string | null {
     if (fallback && fallback.length > 0) return fallback;
     if (!Array.isArray(platforms) || platforms.length === 0) return null;
-
-    const set = new Set<string>(
-      platforms.filter((platform): platform is string => typeof platform === "string")
-    );
-
+    const set = new Set<string>(platforms.filter((platform): platform is string => typeof platform === "string"));
     if (set.has("REGISTERED_PLATFORM_EMAIL")) return "email";
     if (set.has("REGISTERED_PLATFORM_GOOGLE")) return "google";
     if (set.has("REGISTERED_PLATFORM_APPLE")) return "apple";
-    if (set.has("REGISTERED_PLATFORM_MICROSOFT") || set.has("REGISTERED_PLATFORM_AZURE")) {
-      return "microsoft";
-    }
+    if (set.has("REGISTERED_PLATFORM_MICROSOFT") || set.has("REGISTERED_PLATFORM_AZURE")) return "microsoft";
     if (set.has("REGISTERED_PLATFORM_GITHUB")) return "github";
-
     const first = Array.from(set)[0];
     return first ? first.toLowerCase() : null;
   }
@@ -110,16 +95,8 @@ class SDKServer {
 
   async getUserInfo(accessToken: string): Promise<GetUserInfoResponse> {
     const data = await this.oauthService.getUserInfoByToken({ accessToken } as ExchangeTokenResponse);
-    const loginMethod = this.deriveLoginMethod(
-      (data as any)?.platforms,
-      (data as any)?.platform ?? data.platform ?? null
-    );
-
-    return {
-      ...(data as any),
-      platform: loginMethod,
-      loginMethod,
-    } as GetUserInfoResponse;
+    const loginMethod = this.deriveLoginMethod((data as any)?.platforms, (data as any)?.platform ?? data.platform ?? null);
+    return { ...(data as any), platform: loginMethod, loginMethod } as GetUserInfoResponse;
   }
 
   private parseCookies(cookieHeader: string | undefined) {
@@ -129,79 +106,39 @@ class SDKServer {
 
   private getSessionSecret() {
     const secret = ENV.cookieSecret;
-    if (!secret || secret.length < 32) {
-      throw new Error("JWT_SECRET must be configured with at least 32 characters");
-    }
+    if (!secret || secret.length < 32) throw new Error("JWT_SECRET must be configured with at least 32 characters");
     return new TextEncoder().encode(secret);
   }
 
-  async createSessionToken(
-    openId: string,
-    options: { expiresInMs?: number; name?: string } = {}
-  ): Promise<string> {
-    if (!isNonEmptyString(openId)) {
-      throw new Error("openId is required to create a session");
-    }
-    if (!isNonEmptyString(ENV.appId)) {
-      throw new Error("VITE_APP_ID is required to create a session");
-    }
-
-    return this.signSession(
-      {
-        openId,
-        appId: ENV.appId,
-        name: options.name ?? "",
-      },
-      options
-    );
+  async createSessionToken(openId: string, options: { expiresInMs?: number; name?: string } = {}): Promise<string> {
+    if (!isNonEmptyString(openId)) throw new Error("openId is required to create a session");
+    if (!isNonEmptyString(ENV.appId)) throw new Error("VITE_APP_ID is required to create a session");
+    return this.signSession({ openId, appId: ENV.appId, name: options.name ?? "" }, options);
   }
 
-  async signSession(
-    payload: SessionPayload,
-    options: { expiresInMs?: number } = {}
-  ): Promise<string> {
-    if (!isNonEmptyString(payload.openId) || !isNonEmptyString(payload.appId)) {
-      throw new Error("Session requires a valid openId and appId");
-    }
-
+  async signSession(payload: SessionPayload, options: { expiresInMs?: number } = {}): Promise<string> {
+    if (!isNonEmptyString(payload.openId) || !isNonEmptyString(payload.appId)) throw new Error("Session requires a valid openId and appId");
     const issuedAt = Date.now();
     const expiresInMs = options.expiresInMs ?? ONE_YEAR_MS;
     const expirationSeconds = Math.floor((issuedAt + expiresInMs) / 1000);
     const secretKey = this.getSessionSecret();
-
-    return new SignJWT({
-      openId: payload.openId,
-      appId: payload.appId,
-      name: payload.name ?? "",
-    })
+    return new SignJWT({ openId: payload.openId, appId: payload.appId, name: payload.name ?? "" })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
       .setIssuedAt(Math.floor(issuedAt / 1000))
       .setExpirationTime(expirationSeconds)
       .sign(secretKey);
   }
 
-  async verifySession(
-    cookieValue: string | undefined | null
-  ): Promise<{ openId: string; appId: string; name: string } | null> {
+  async verifySession(cookieValue: string | undefined | null): Promise<{ openId: string; appId: string; name: string } | null> {
     if (!cookieValue) return null;
-
     try {
       const secretKey = this.getSessionSecret();
-      const { payload } = await jwtVerify(cookieValue, secretKey, {
-        algorithms: ["HS256"],
-      });
+      const { payload } = await jwtVerify(cookieValue, secretKey, { algorithms: ["HS256"] });
       const { openId, appId, name } = payload as Record<string, unknown>;
-
-      if (
-        !isNonEmptyString(openId) ||
-        !isNonEmptyString(appId) ||
-        typeof name !== "string" ||
-        (ENV.appId && appId !== ENV.appId)
-      ) {
+      if (!isNonEmptyString(openId) || !isNonEmptyString(appId) || typeof name !== "string" || (ENV.appId && appId !== ENV.appId)) {
         console.warn("[Auth] Invalid session payload");
         return null;
       }
-
       return { openId, appId, name };
     } catch (error) {
       console.warn("[Auth] Session verification failed", String(error));
@@ -210,66 +147,31 @@ class SDKServer {
   }
 
   async getUserInfoWithJwt(jwtToken: string): Promise<GetUserInfoWithJwtResponse> {
-    const payload: GetUserInfoWithJwtRequest = {
-      jwtToken,
-      projectId: ENV.appId,
-    };
-
-    const { data } = await this.client.post<GetUserInfoWithJwtResponse>(
-      GET_USER_INFO_WITH_JWT_PATH,
-      payload
-    );
-
-    const loginMethod = this.deriveLoginMethod(
-      (data as any)?.platforms,
-      (data as any)?.platform ?? data.platform ?? null
-    );
-
-    return {
-      ...(data as any),
-      platform: loginMethod,
-      loginMethod,
-    } as GetUserInfoWithJwtResponse;
+    const payload: GetUserInfoWithJwtRequest = { jwtToken, projectId: ENV.appId };
+    const { data } = await this.client.post<GetUserInfoWithJwtResponse>(GET_USER_INFO_WITH_JWT_PATH, payload);
+    const loginMethod = this.deriveLoginMethod((data as any)?.platforms, (data as any)?.platform ?? data.platform ?? null);
+    return { ...(data as any), platform: loginMethod, loginMethod } as GetUserInfoWithJwtResponse;
   }
 
   async authenticateRequest(req: Request): Promise<User> {
     const cookies = this.parseCookies(req.headers.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);
     const session = await this.verifySession(sessionCookie);
-
-    if (!session) {
-      throw ForbiddenError("Invalid session cookie");
-    }
-
+    if (!session) throw ForbiddenError("Invalid session cookie");
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(session.openId);
-
     if (!user) {
       try {
         const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
-        await db.upsertUser({
-          openId: userInfo.openId,
-          name: userInfo.name || null,
-          email: userInfo.email ?? null,
-          loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
-          lastSignedIn: signedInAt,
-        });
+        await db.upsertUser({ openId: userInfo.openId, name: userInfo.name || null, email: userInfo.email ?? null, loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null, lastSignedIn: signedInAt });
         user = await db.getUserByOpenId(userInfo.openId);
       } catch (error) {
         console.error("[Auth] Failed to sync user from OAuth:", error);
         throw ForbiddenError("Failed to sync user info");
       }
     }
-
-    if (!user) {
-      throw ForbiddenError("User not found");
-    }
-
-    await db.upsertUser({
-      openId: user.openId,
-      lastSignedIn: signedInAt,
-    });
-
+    if (!user) throw ForbiddenError("User not found");
+    await db.upsertUser({ openId: user.openId, lastSignedIn: signedInAt });
     return user;
   }
 }
