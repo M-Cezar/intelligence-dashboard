@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
@@ -9,11 +10,13 @@ type UseAuthOptions = {
 };
 
 export function useAuth(options?: UseAuthOptions) {
+  const isNative = Capacitor.isNativePlatform();
   const { redirectOnUnauthenticated = false, redirectPath = getLoginUrl() } =
     options ?? {};
   const utils = trpc.useUtils();
 
   const meQuery = trpc.auth.me.useQuery(undefined, {
+    enabled: !isNative,
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -25,6 +28,8 @@ export function useAuth(options?: UseAuthOptions) {
   });
 
   const logout = useCallback(async () => {
+    if (isNative) return;
+
     try {
       await logoutMutation.mutateAsync();
     } catch (error: unknown) {
@@ -39,20 +44,24 @@ export function useAuth(options?: UseAuthOptions) {
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
     }
-  }, [logoutMutation, utils]);
+  }, [isNative, logoutMutation, utils]);
 
   const state = useMemo(() => {
-    localStorage.setItem(
-      "manus-runtime-user-info",
-      JSON.stringify(meQuery.data)
-    );
+    const localUser = isNative
+      ? { name: "Usuário local", email: "modo-local" }
+      : null;
+    const user = meQuery.data ?? localUser;
+
+    localStorage.setItem("manus-runtime-user-info", JSON.stringify(user));
+
     return {
-      user: meQuery.data ?? null,
-      loading: meQuery.isLoading || logoutMutation.isPending,
-      error: meQuery.error ?? logoutMutation.error ?? null,
-      isAuthenticated: Boolean(meQuery.data),
+      user,
+      loading: isNative ? false : meQuery.isLoading || logoutMutation.isPending,
+      error: isNative ? null : meQuery.error ?? logoutMutation.error ?? null,
+      isAuthenticated: Boolean(user),
     };
   }, [
+    isNative,
     meQuery.data,
     meQuery.error,
     meQuery.isLoading,
@@ -61,14 +70,16 @@ export function useAuth(options?: UseAuthOptions) {
   ]);
 
   useEffect(() => {
+    if (isNative) return;
     if (!redirectOnUnauthenticated) return;
     if (meQuery.isLoading || logoutMutation.isPending) return;
     if (state.user) return;
     if (typeof window === "undefined") return;
     if (window.location.pathname === redirectPath) return;
 
-    window.location.href = redirectPath
+    window.location.href = redirectPath;
   }, [
+    isNative,
     redirectOnUnauthenticated,
     redirectPath,
     logoutMutation.isPending,
@@ -78,7 +89,7 @@ export function useAuth(options?: UseAuthOptions) {
 
   return {
     ...state,
-    refresh: () => meQuery.refetch(),
+    refresh: () => (isNative ? Promise.resolve(null) : meQuery.refetch()),
     logout,
   };
 }
