@@ -137,7 +137,7 @@ const noticias: Noticia[] = [
     fonte: "Olhar Digital",
     resumo: "As gigantes da IA levam a disputa para o horário nobre da TV americana.",
     categoria: "IA",
-    data: "Hoje"
+    data: "Base local"
   },
   {
     id: "2",
@@ -145,7 +145,7 @@ const noticias: Noticia[] = [
     fonte: "Exame",
     resumo: "Vazamento revela salários astronômicos para talentos de IA na gigante de tecnologia.",
     categoria: "Tecnologia",
-    data: "Hoje"
+    data: "Base local"
   },
   {
     id: "3",
@@ -153,7 +153,7 @@ const noticias: Noticia[] = [
     fonte: "BBC News Brasil",
     resumo: "Nova plataforma gera debates sobre o futuro da interação entre máquinas.",
     categoria: "IA",
-    data: "Ontem"
+    data: "Base local"
   },
   {
     id: "4",
@@ -161,7 +161,7 @@ const noticias: Noticia[] = [
     fonte: "InfoMoney",
     resumo: "Análise aprofundada sobre os desafios da implementação de IA em empresas.",
     categoria: "Tecnologia",
-    data: "2 dias atrás"
+    data: "Base local"
   }
 ];
 
@@ -814,7 +814,7 @@ export default function Home() {
                       <div className="flex items-center gap-2">
                         <BookOpen className="h-4 w-4 text-gray-400" />
                         <div>
-                          <p className="text-xs text-gray-600">Area</p>
+                          <p className="text-xs text-gray-600">Área</p>
                           <p className="font-semibold text-gray-900 text-sm">{curso.area}</p>
                         </div>
                       </div>
@@ -838,7 +838,7 @@ export default function Home() {
                       className="w-full justify-between text-purple-700 hover:bg-purple-50"
                       onClick={() => navigate(`/curso/${curso.id}`)}
                     >
-                      Inscrever-se
+                      Ver detalhes
                       <ChevronRight className="h-4 w-4" />
                     </Button>
                   </CardContent>
@@ -852,8 +852,8 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-gray-200 bg-gray-50 py-8 mt-12">
         <div className="container mx-auto px-4 text-center text-sm text-gray-600">
-          <p>Dashboard de Inteligência e Oportunidades • Dados atualizados em tempo real</p>
-          <p className="mt-2">Desenvolvido com ❤️ para ajudar você a tomar melhores decisões</p>
+          <p>Dashboard de Inteligência e Oportunidades • Base local para validação; confirme dados nas fontes oficiais</p>
+          <p className="mt-2">Centralização de informações para consulta e análise</p>
           <p className="mt-3 text-xs text-gray-500">Feito por Manus e Cézar</p>
         </div>
       </footer>
