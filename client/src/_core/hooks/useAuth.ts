@@ -11,8 +11,7 @@ type UseAuthOptions = {
 
 export function useAuth(options?: UseAuthOptions) {
   const isNative = Capacitor.isNativePlatform();
-  const { redirectOnUnauthenticated = false, redirectPath = getLoginUrl() } =
-    options ?? {};
+  const { redirectOnUnauthenticated = false, redirectPath = getLoginUrl() } = options ?? {};
   const utils = trpc.useUtils();
 
   const meQuery = trpc.auth.me.useQuery(undefined, {
@@ -33,12 +32,7 @@ export function useAuth(options?: UseAuthOptions) {
     try {
       await logoutMutation.mutateAsync();
     } catch (error: unknown) {
-      if (
-        error instanceof TRPCClientError &&
-        error.data?.code === "UNAUTHORIZED"
-      ) {
-        return;
-      }
+      if (error instanceof TRPCClientError && error.data?.code === "UNAUTHORIZED") return;
       throw error;
     } finally {
       utils.auth.me.setData(undefined, null);
@@ -47,12 +41,8 @@ export function useAuth(options?: UseAuthOptions) {
   }, [isNative, logoutMutation, utils]);
 
   const state = useMemo(() => {
-    const localUser = isNative
-      ? { name: "Usuário local", email: "modo-local" }
-      : null;
+    const localUser = isNative ? { name: "Modo local", email: "local" } : null;
     const user = meQuery.data ?? localUser;
-
-    localStorage.setItem("manus-runtime-user-info", JSON.stringify(user));
 
     return {
       user,
@@ -60,35 +50,27 @@ export function useAuth(options?: UseAuthOptions) {
       error: isNative ? null : meQuery.error ?? logoutMutation.error ?? null,
       isAuthenticated: Boolean(user),
     };
-  }, [
-    isNative,
-    meQuery.data,
-    meQuery.error,
-    meQuery.isLoading,
-    logoutMutation.error,
-    logoutMutation.isPending,
-  ]);
+  }, [isNative, meQuery.data, meQuery.error, meQuery.isLoading, logoutMutation.error, logoutMutation.isPending]);
 
   useEffect(() => {
-    if (isNative) return;
-    if (!redirectOnUnauthenticated) return;
-    if (meQuery.isLoading || logoutMutation.isPending) return;
-    if (state.user) return;
     if (typeof window === "undefined") return;
-    if (window.location.pathname === redirectPath) return;
+    try {
+      localStorage.setItem("manus-runtime-user-info", JSON.stringify(state.user));
+    } catch {
+      // Storage can be unavailable in restricted browser contexts; auth must still work.
+    }
+  }, [state.user]);
 
+  useEffect(() => {
+    if (isNative || !redirectOnUnauthenticated) return;
+    if (meQuery.isLoading || logoutMutation.isPending || state.user) return;
+    if (typeof window === "undefined" || window.location.pathname === redirectPath) return;
     window.location.href = redirectPath;
-  }, [
-    isNative,
-    redirectOnUnauthenticated,
-    redirectPath,
-    logoutMutation.isPending,
-    meQuery.isLoading,
-    state.user,
-  ]);
+  }, [isNative, redirectOnUnauthenticated, redirectPath, logoutMutation.isPending, meQuery.isLoading, state.user]);
 
   return {
     ...state,
+    isNative,
     refresh: () => (isNative ? Promise.resolve(null) : meQuery.refetch()),
     logout,
   };

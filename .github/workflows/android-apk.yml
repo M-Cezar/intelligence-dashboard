@@ -30,6 +30,11 @@ jobs:
         with:
           node-version: 22
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -37,16 +42,22 @@ jobs:
           java-version: 21
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript check
+        run: pnpm run check
+
+      - name: Tests
+        run: pnpm run test
 
       - name: Build web app
-        run: npm run build:web
+        run: pnpm run build:web
 
       - name: Create Android project
-        run: npx cap add android
+        run: pnpm exec cap add android
 
       - name: Sync Android
-        run: npx cap sync android
+        run: pnpm exec cap sync android
 
       - name: Build debug APK
         run: |

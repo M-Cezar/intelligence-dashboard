@@ -137,7 +137,7 @@ const noticias: Noticia[] = [
     fonte: "Olhar Digital",
     resumo: "As gigantes da IA levam a disputa para o horário nobre da TV americana.",
     categoria: "IA",
-    data: "Hoje"
+    data: "Base local"
   },
   {
     id: "2",
@@ -145,7 +145,7 @@ const noticias: Noticia[] = [
     fonte: "Exame",
     resumo: "Vazamento revela salários astronômicos para talentos de IA na gigante de tecnologia.",
     categoria: "Tecnologia",
-    data: "Hoje"
+    data: "Base local"
   },
   {
     id: "3",
@@ -153,7 +153,7 @@ const noticias: Noticia[] = [
     fonte: "BBC News Brasil",
     resumo: "Nova plataforma gera debates sobre o futuro da interação entre máquinas.",
     categoria: "IA",
-    data: "Ontem"
+    data: "Base local"
   },
   {
     id: "4",
@@ -161,7 +161,7 @@ const noticias: Noticia[] = [
     fonte: "InfoMoney",
     resumo: "Análise aprofundada sobre os desafios da implementação de IA em empresas.",
     categoria: "Tecnologia",
-    data: "2 dias atrás"
+    data: "Base local"
   }
 ];
 
@@ -388,7 +388,7 @@ function getStatusLabel(status: string) {
 export default function Home() {
   // The userAuth hooks provides authentication state
   // To implement login/logout functionality, simply call logout() or redirect to getLoginUrl()
-  let { user, loading, error, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, isNative, logout } = useAuth();
 
   const [, navigate] = useLocation();
   const [selectedRegion, setSelectedRegion] = useState<string>("todos");
@@ -415,7 +415,7 @@ export default function Home() {
       {/* Header */}
       <header className="sticky top-0 z-40 border-b border-gray-200 bg-white/95 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <div className="rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 p-2">
                 <Briefcase className="h-6 w-6 text-white" />
@@ -425,13 +425,15 @@ export default function Home() {
                 <p className="text-sm text-gray-600">Concursos, IA, Investimentos & Cursos</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              {isAuthenticated && user && (
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+              {isNative ? (
+                <div className="text-sm font-semibold text-gray-700">Modo local</div>
+              ) : isAuthenticated && user ? (
                 <div className="text-sm text-gray-700">
                   Bem-vindo, <span className="font-semibold">{user.name || user.email}</span>
                 </div>
-              )}
-              {isAuthenticated ? (
+              ) : null}
+              {!isNative && (isAuthenticated ? (
                 <Button variant="outline" size="sm" onClick={logout}>
                   Sair
                 </Button>
@@ -439,9 +441,9 @@ export default function Home() {
                 <Button size="sm" onClick={() => window.location.href = '/api/oauth/login'}>
                   Entrar
                 </Button>
-              )}
+              ))}
               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
-                Atualizado hoje
+                Base local
               </Badge>
             </div>
           </div>
@@ -461,7 +463,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-gray-900">{filteredConcursos.length}</div>
-                <p className="text-sm text-gray-600 mt-1">Concursos disponíveis</p>
+                <p className="text-sm text-gray-600 mt-1">Concursos na base</p>
               </CardContent>
             </Card>
 
@@ -474,7 +476,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-gray-900">{noticias.length}</div>
-                <p className="text-sm text-gray-600 mt-1">Notícias recentes</p>
+                <p className="text-sm text-gray-600 mt-1">Notícias na base</p>
               </CardContent>
             </Card>
 
@@ -487,7 +489,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-gray-900">{ativos.length}</div>
-                <p className="text-sm text-gray-600 mt-1">Ativos monitorados</p>
+                <p className="text-sm text-gray-600 mt-1">Ativos na base</p>
               </CardContent>
             </Card>
 
@@ -543,7 +545,7 @@ export default function Home() {
                   />
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant={selectedRegion === "todos" ? "default" : "outline"}
                   onClick={() => setSelectedRegion("todos")}
@@ -666,7 +668,7 @@ export default function Home() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-sm text-gray-600">Fonte: <span className="font-semibold">{noticia.fonte}</span></p>
                       <Button variant="ghost" className="text-blue-700 hover:bg-blue-50 gap-2" onClick={() => navigate(`/noticia/${noticia.id}`)}>
                         Ler mais
@@ -688,7 +690,7 @@ export default function Home() {
                   className="border-gray-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer group"
                 >
                   <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <CardTitle className="text-base text-gray-900">
                           {ativo.ticker}
@@ -758,7 +760,7 @@ export default function Home() {
           <TabsContent value="cursos" className="space-y-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="flex-1" />
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant={selectedCursoRegion === "todos" ? "default" : "outline"}
                   onClick={() => setSelectedCursoRegion("todos")}
@@ -814,7 +816,7 @@ export default function Home() {
                       <div className="flex items-center gap-2">
                         <BookOpen className="h-4 w-4 text-gray-400" />
                         <div>
-                          <p className="text-xs text-gray-600">Area</p>
+                          <p className="text-xs text-gray-600">Área</p>
                           <p className="font-semibold text-gray-900 text-sm">{curso.area}</p>
                         </div>
                       </div>
@@ -838,7 +840,7 @@ export default function Home() {
                       className="w-full justify-between text-purple-700 hover:bg-purple-50"
                       onClick={() => navigate(`/curso/${curso.id}`)}
                     >
-                      Inscrever-se
+                      Ver detalhes
                       <ChevronRight className="h-4 w-4" />
                     </Button>
                   </CardContent>
@@ -852,8 +854,8 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-gray-200 bg-gray-50 py-8 mt-12">
         <div className="container mx-auto px-4 text-center text-sm text-gray-600">
-          <p>Dashboard de Inteligência e Oportunidades • Dados atualizados em tempo real</p>
-          <p className="mt-2">Desenvolvido com ❤️ para ajudar você a tomar melhores decisões</p>
+          <p>Dashboard de Inteligência e Oportunidades • Base local para validação; confirme dados nas fontes oficiais</p>
+          <p className="mt-2">Centralização de informações para consulta e análise</p>
           <p className="mt-3 text-xs text-gray-500">Feito por Manus e Cézar</p>
         </div>
       </footer>
