@@ -1,8 +1,5 @@
 /**
- * Quick example (matches curl usage):
- *   await callDataApi("Youtube/search", {
- *     query: { gl: "US", hl: "en", q: "manus" },
- *   })
+ * Generic data API proxy helper.
  */
 import { ENV } from "./env";
 
@@ -13,18 +10,10 @@ export type DataApiCallOptions = {
   formData?: Record<string, unknown>;
 };
 
-export async function callDataApi(
-  apiId: string,
-  options: DataApiCallOptions = {}
-): Promise<unknown> {
-  if (!ENV.forgeApiUrl) {
-    throw new Error("BUILT_IN_FORGE_API_URL is not configured");
-  }
-  if (!ENV.forgeApiKey) {
-    throw new Error("BUILT_IN_FORGE_API_KEY is not configured");
-  }
+export async function callDataApi(apiId: string, options: DataApiCallOptions = {}): Promise<unknown> {
+  if (!ENV.forgeApiUrl) throw new Error("BUILT_IN_FORGE_API_URL is not configured");
+  if (!ENV.forgeApiKey) throw new Error("BUILT_IN_FORGE_API_KEY is not configured");
 
-  // Build the full URL by appending the service path to the base URL
   const baseUrl = ENV.forgeApiUrl.endsWith("/") ? ENV.forgeApiUrl : `${ENV.forgeApiUrl}/`;
   const fullUrl = new URL("webdevtoken.v1.WebDevService/CallApi", baseUrl).toString();
 
@@ -36,20 +25,12 @@ export async function callDataApi(
       "connect-protocol-version": "1",
       authorization: `Bearer ${ENV.forgeApiKey}`,
     },
-    body: JSON.stringify({
-      apiId,
-      query: options.query,
-      body: options.body,
-      path_params: options.pathParams,
-      multipart_form_data: options.formData,
-    }),
+    body: JSON.stringify({ apiId, query: options.query, body: options.body, path_params: options.pathParams, multipart_form_data: options.formData }),
   });
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
-    throw new Error(
-      `Data API request failed (${response.status} ${response.statusText})${detail ? `: ${detail}` : ""}`
-    );
+    throw new Error(`Data API request failed (${response.status} ${response.statusText})${detail ? `: ${detail}` : ""}`);
   }
 
   const payload = await response.json().catch(() => ({}));
