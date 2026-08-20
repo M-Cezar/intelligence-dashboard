@@ -1,0 +1,43 @@
+name: Cleanup provider branding
+
+on:
+  push:
+    branches:
+      - cleanup/remove-manus
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cleanup/remove-manus
+      - name: Remove remaining provider branding from tracked text files
+        shell: bash
+        run: |
+          git grep -Il -e 'Manus' -e 'manus' -- ':!*.lock' ':!pnpm-lock.yaml' | while read -r file; do
+            sed -i 's/Manus/Intelligence Dashboard/g; s/manus/intelligence-dashboard/g' "$file"
+          done
+      - name: Verify current tree
+        shell: bash
+        run: |
+          if git grep -In -e 'Manus' -e 'manus' -- ':!*.lock' ':!pnpm-lock.yaml'; then
+            echo 'Provider branding still present'
+            exit 1
+          fi
+      - name: Commit cleanup
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name 'M-Cezar'
+          git config user.email '72666088+M-Cezar@users.noreply.github.com'
+          git add -- client/src/pages/Home.tsx
+          git commit -m 'Remove remaining provider branding'
+          git push origin HEAD:cleanup/remove-manus
