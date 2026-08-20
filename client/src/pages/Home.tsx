@@ -690,7 +690,7 @@ export default function Home() {
                   className="border-gray-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer group"
                 >
                   <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <CardTitle className="text-base text-gray-900">
                           {ativo.ticker}
