@@ -415,7 +415,7 @@ export default function Home() {
       {/* Header */}
       <header className="sticky top-0 z-40 border-b border-gray-200 bg-white/95 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <div className="rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 p-2">
                 <Briefcase className="h-6 w-6 text-white" />
@@ -425,12 +425,14 @@ export default function Home() {
                 <p className="text-sm text-gray-600">Concursos, IA, Investimentos & Cursos</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              {isAuthenticated && user && (
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+              {isNative ? (
+                <div className="text-sm font-semibold text-gray-700">Modo local</div>
+              ) : isAuthenticated && user ? (
                 <div className="text-sm text-gray-700">
                   Bem-vindo, <span className="font-semibold">{user.name || user.email}</span>
                 </div>
-              )}
+              ) : null}
               {!isNative && (isAuthenticated ? (
                 <Button variant="outline" size="sm" onClick={logout}>
                   Sair
@@ -543,7 +545,7 @@ export default function Home() {
                   />
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant={selectedRegion === "todos" ? "default" : "outline"}
                   onClick={() => setSelectedRegion("todos")}
@@ -758,7 +760,7 @@ export default function Home() {
           <TabsContent value="cursos" className="space-y-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="flex-1" />
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant={selectedCursoRegion === "todos" ? "default" : "outline"}
                   onClick={() => setSelectedCursoRegion("todos")}
