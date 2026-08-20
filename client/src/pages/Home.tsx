@@ -388,7 +388,7 @@ function getStatusLabel(status: string) {
 export default function Home() {
   // The userAuth hooks provides authentication state
   // To implement login/logout functionality, simply call logout() or redirect to getLoginUrl()
-  let { user, loading, error, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, isNative, logout } = useAuth();
 
   const [, navigate] = useLocation();
   const [selectedRegion, setSelectedRegion] = useState<string>("todos");
@@ -431,7 +431,7 @@ export default function Home() {
                   Bem-vindo, <span className="font-semibold">{user.name || user.email}</span>
                 </div>
               )}
-              {isAuthenticated ? (
+              {!isNative && (isAuthenticated ? (
                 <Button variant="outline" size="sm" onClick={logout}>
                   Sair
                 </Button>
@@ -439,9 +439,9 @@ export default function Home() {
                 <Button size="sm" onClick={() => window.location.href = '/api/oauth/login'}>
                   Entrar
                 </Button>
-              )}
+              ))}
               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
-                Atualizado hoje
+                Base local
               </Badge>
             </div>
           </div>
@@ -461,7 +461,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-gray-900">{filteredConcursos.length}</div>
-                <p className="text-sm text-gray-600 mt-1">Concursos disponíveis</p>
+                <p className="text-sm text-gray-600 mt-1">Concursos na base</p>
               </CardContent>
             </Card>
 
@@ -474,7 +474,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-gray-900">{noticias.length}</div>
-                <p className="text-sm text-gray-600 mt-1">Notícias recentes</p>
+                <p className="text-sm text-gray-600 mt-1">Notícias na base</p>
               </CardContent>
             </Card>
 
@@ -487,7 +487,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-gray-900">{ativos.length}</div>
-                <p className="text-sm text-gray-600 mt-1">Ativos monitorados</p>
+                <p className="text-sm text-gray-600 mt-1">Ativos na base</p>
               </CardContent>
             </Card>
 
