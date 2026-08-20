@@ -668,7 +668,7 @@ export default function Home() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-sm text-gray-600">Fonte: <span className="font-semibold">{noticia.fonte}</span></p>
                       <Button variant="ghost" className="text-blue-700 hover:bg-blue-50 gap-2" onClick={() => navigate(`/noticia/${noticia.id}`)}>
                         Ler mais
