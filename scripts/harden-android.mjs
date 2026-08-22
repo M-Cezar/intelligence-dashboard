@@ -58,7 +58,6 @@ const backupDomains = [
   "device_file",
   "device_database",
   "device_sharedpref",
-  "device_external",
 ];
 const exclusions = backupDomains
   .map(domain => `        <exclude domain="${domain}" path="." />`)
