@@ -3,6 +3,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const manifestPath = path.join(root, "android/app/src/main/AndroidManifest.xml");
+const appGradlePath = path.join(root, "android/app/build.gradle");
 const xmlDir = path.join(root, "android/app/src/main/res/xml");
 const mainActivityPath = path.join(
   root,
@@ -11,6 +12,9 @@ const mainActivityPath = path.join(
 
 if (!fs.existsSync(manifestPath)) {
   throw new Error(`AndroidManifest.xml not found: ${manifestPath}`);
+}
+if (!fs.existsSync(appGradlePath)) {
+  throw new Error(`Android app build.gradle not found: ${appGradlePath}`);
 }
 
 let manifest = fs.readFileSync(manifestPath, "utf8");
@@ -44,9 +48,25 @@ fs.writeFileSync(
   `<?xml version="1.0" encoding="utf-8"?>\n<network-security-config>\n    <base-config cleartextTrafficPermitted="false">\n        <trust-anchors>\n            <certificates src="system" />\n        </trust-anchors>\n    </base-config>\n</network-security-config>\n`
 );
 
+const backupDomains = [
+  "root",
+  "file",
+  "database",
+  "sharedpref",
+  "external",
+  "device_root",
+  "device_file",
+  "device_database",
+  "device_sharedpref",
+  "device_external",
+];
+const exclusions = backupDomains
+  .map(domain => `        <exclude domain="${domain}" path="." />`)
+  .join("\n");
+
 fs.writeFileSync(
   path.join(xmlDir, "data_extraction_rules.xml"),
-  `<?xml version="1.0" encoding="utf-8"?>\n<data-extraction-rules>\n    <cloud-backup disableIfNoEncryptionCapabilities="true">\n        <exclude domain="root" path="." />\n        <exclude domain="file" path="." />\n        <exclude domain="database" path="." />\n        <exclude domain="sharedpref" path="." />\n        <exclude domain="external" path="." />\n    </cloud-backup>\n    <device-transfer>\n        <exclude domain="root" path="." />\n        <exclude domain="file" path="." />\n        <exclude domain="database" path="." />\n        <exclude domain="sharedpref" path="." />\n        <exclude domain="external" path="." />\n    </device-transfer>\n</data-extraction-rules>\n`
+  `<?xml version="1.0" encoding="utf-8"?>\n<data-extraction-rules>\n    <cloud-backup disableIfNoEncryptionCapabilities="true">\n${exclusions}\n    </cloud-backup>\n    <device-transfer>\n${exclusions}\n    </device-transfer>\n</data-extraction-rules>\n`
 );
 
 fs.mkdirSync(path.dirname(mainActivityPath), { recursive: true });
@@ -55,4 +75,15 @@ fs.writeFileSync(
   `package com.mcezar.intelligencedashboard;\n\nimport android.os.Bundle;\nimport android.webkit.WebSettings;\nimport android.webkit.WebView;\n\nimport com.getcapacitor.BridgeActivity;\n\npublic class MainActivity extends BridgeActivity {\n    @Override\n    protected void onCreate(Bundle savedInstanceState) {\n        super.onCreate(savedInstanceState);\n\n        WebView.setWebContentsDebuggingEnabled(false);\n\n        WebView webView = getBridge().getWebView();\n        WebSettings settings = webView.getSettings();\n        settings.setAllowFileAccess(false);\n        settings.setAllowContentAccess(false);\n        settings.setAllowFileAccessFromFileURLs(false);\n        settings.setAllowUniversalAccessFromFileURLs(false);\n        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);\n    }\n}\n`
 );
 
-console.log("Android hardening applied: backups disabled, HTTPS-only network policy, WebView debugging/file access disabled.");
+let appGradle = fs.readFileSync(appGradlePath, "utf8");
+if (!/buildTypes\s*\{[\s\S]*?debug\s*\{[\s\S]*?debuggable\s+false/.test(appGradle)) {
+  appGradle = appGradle.replace(
+    /buildTypes\s*\{/,
+    `buildTypes {\n        debug {\n            debuggable false\n        }`
+  );
+}
+fs.writeFileSync(appGradlePath, appGradle);
+
+console.log(
+  "Android hardening applied: backups disabled, HTTPS-only networking, WebView debug/file access disabled, and debug build marked non-debuggable."
+);
