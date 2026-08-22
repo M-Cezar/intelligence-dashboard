@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - security/android-hardening
   pull_request:
     branches:
       - main
@@ -19,7 +20,7 @@ concurrency:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -44,6 +45,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Dependency audit
+        run: pnpm audit --audit-level moderate
+
       - name: TypeScript check
         run: pnpm run check
 
@@ -53,21 +57,85 @@ jobs:
       - name: Build web app
         run: pnpm run build:web
 
+      - name: Reject secrets and debug residue in web bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          if find dist/public -type f -path '*__manus__*' | grep -q .; then
+            echo 'Legacy debug collector found in web bundle'
+            exit 1
+          fi
+          if grep -RInaE --binary-files=without-match \
+            '(BUILT_IN_FORGE_API_KEY|JWT_SECRET|DATABASE_URL|VITE_FRONTEND_FORGE_API_KEY|-----BEGIN ([A-Z ]+ )?PRIVATE KEY-----)' \
+            dist/public; then
+            echo 'Potential secret or secret-variable residue found in web bundle'
+            exit 1
+          fi
+
       - name: Create Android project
         run: pnpm exec cap add android
 
       - name: Sync Android
         run: pnpm exec cap sync android
 
-      - name: Build debug APK
+      - name: Apply Android hardening
+        run: node scripts/harden-android.mjs
+
+      - name: Verify Android security policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          grep -q 'android:allowBackup="false"' "$MANIFEST"
+          grep -q 'android:fullBackupContent="false"' "$MANIFEST"
+          grep -q 'android:usesCleartextTraffic="false"' "$MANIFEST"
+          grep -q 'android:networkSecurityConfig="@xml/network_security_config"' "$MANIFEST"
+          grep -q 'cleartextTrafficPermitted="false"' android/app/src/main/res/xml/network_security_config.xml
+          grep -q 'WebView.setWebContentsDebuggingEnabled(false)' android/app/src/main/java/com/mcezar/intelligencedashboard/MainActivity.java
+          grep -q 'settings.setAllowFileAccess(false)' android/app/src/main/java/com/mcezar/intelligencedashboard/MainActivity.java
+          if grep -REn 'uses-permission[^>]+android.permission.(READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|MANAGE_EXTERNAL_STORAGE|QUERY_ALL_PACKAGES|REQUEST_INSTALL_PACKAGES|SYSTEM_ALERT_WINDOW|RECORD_AUDIO|CAMERA|ACCESS_FINE_LOCATION|READ_CONTACTS|READ_SMS|SEND_SMS)' android/app/src/main/AndroidManifest.xml android/app/src/main 2>/dev/null; then
+            echo 'Unexpected dangerous Android permission found'
+            exit 1
+          fi
+
+      - name: Android lint
         run: |
           cd android
           chmod +x gradlew
+          ./gradlew lintDebug --stacktrace
+
+      - name: Build hardened test APK
+        run: |
+          cd android
           ./gradlew assembleDebug --stacktrace
+
+      - name: Scan APK contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          test -f "$APK"
+          unzip -l "$APK" > /tmp/apk-files.txt
+          if grep -Ei '(__manus__|debug-collector\.js|\.map$)' /tmp/apk-files.txt; then
+            echo 'Debug residue or source maps found inside APK'
+            exit 1
+          fi
+          rm -rf /tmp/apk-scan
+          mkdir -p /tmp/apk-scan
+          unzip -q "$APK" 'assets/*' -d /tmp/apk-scan
+          if grep -RInaE --binary-files=without-match \
+            '(BUILT_IN_FORGE_API_KEY|JWT_SECRET|DATABASE_URL|VITE_FRONTEND_FORGE_API_KEY|-----BEGIN ([A-Z ]+ )?PRIVATE KEY-----)' \
+            /tmp/apk-scan; then
+            echo 'Potential secret found inside APK assets'
+            exit 1
+          fi
+
+      - name: SHA-256
+        run: sha256sum android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: intelligence-dashboard-debug-apk
+          name: intelligence-dashboard-hardened-test-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
