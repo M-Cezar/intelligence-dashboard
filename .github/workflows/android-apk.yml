@@ -46,7 +46,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Dependency audit
-        run: pnpm audit --audit-level moderate
+        run: pnpm audit --audit-level low
 
       - name: TypeScript check
         run: pnpm run check
