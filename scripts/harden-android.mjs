@@ -19,6 +19,13 @@ if (!fs.existsSync(appGradlePath)) {
 
 let manifest = fs.readFileSync(manifestPath, "utf8");
 
+if (!manifest.includes('xmlns:tools="http://schemas.android.com/tools"')) {
+  manifest = manifest.replace(
+    /<manifest\b([^>]*)>/,
+    '<manifest$1 xmlns:tools="http://schemas.android.com/tools">'
+  );
+}
+
 const requiredApplicationAttributes = {
   "android:allowBackup": "false",
   "android:fullBackupContent": "false",
@@ -39,6 +46,11 @@ manifest = manifest.replace(/<application\b([^>]*)>/, (match, attrs) => {
   }
   return `<application${next}>`;
 });
+
+const profileReceiverRemoval = `\n        <receiver\n            android:name="androidx.profileinstaller.ProfileInstallReceiver"\n            tools:node="remove" />`;
+if (!manifest.includes('android:name="androidx.profileinstaller.ProfileInstallReceiver"')) {
+  manifest = manifest.replace("</application>", `${profileReceiverRemoval}\n    </application>`);
+}
 
 fs.writeFileSync(manifestPath, manifest);
 fs.mkdirSync(xmlDir, { recursive: true });
@@ -84,5 +96,5 @@ if (!/buildTypes\s*\{[\s\S]*?debug\s*\{[\s\S]*?debuggable\s+false/.test(appGradl
 fs.writeFileSync(appGradlePath, appGradle);
 
 console.log(
-  "Android hardening applied: backups disabled, HTTPS-only networking, WebView debug/file access disabled, and debug build marked non-debuggable."
+  "Android hardening applied: backups disabled, HTTPS-only networking, WebView debug/file access disabled, debug build non-debuggable, and unnecessary exported profile receiver removed."
 );
