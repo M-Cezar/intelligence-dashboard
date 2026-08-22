@@ -71,6 +71,11 @@ jobs:
             echo 'Potential secret or secret-variable residue found in web bundle'
             exit 1
           fi
+          if grep -RInaE --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' \
+            'import\.meta\.env\.VITE_[A-Z0-9_]*(KEY|SECRET|TOKEN|PASSWORD)' client/src; then
+            echo 'Secret-like VITE variable referenced by frontend code'
+            exit 1
+          fi
 
       - name: Create Android project
         run: pnpm exec cap add android
@@ -91,8 +96,11 @@ jobs:
           grep -q 'android:usesCleartextTraffic="false"' "$MANIFEST"
           grep -q 'android:networkSecurityConfig="@xml/network_security_config"' "$MANIFEST"
           grep -q 'cleartextTrafficPermitted="false"' android/app/src/main/res/xml/network_security_config.xml
+          grep -q 'debuggable false' android/app/build.gradle
           grep -q 'WebView.setWebContentsDebuggingEnabled(false)' android/app/src/main/java/com/mcezar/intelligencedashboard/MainActivity.java
           grep -q 'settings.setAllowFileAccess(false)' android/app/src/main/java/com/mcezar/intelligencedashboard/MainActivity.java
+          grep -q 'settings.setAllowContentAccess(false)' android/app/src/main/java/com/mcezar/intelligencedashboard/MainActivity.java
+          grep -q 'settings.setAllowUniversalAccessFromFileURLs(false)' android/app/src/main/java/com/mcezar/intelligencedashboard/MainActivity.java
           if grep -REn 'uses-permission[^>]+android.permission.(READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|MANAGE_EXTERNAL_STORAGE|QUERY_ALL_PACKAGES|REQUEST_INSTALL_PACKAGES|SYSTEM_ALERT_WINDOW|RECORD_AUDIO|CAMERA|ACCESS_FINE_LOCATION|READ_CONTACTS|READ_SMS|SEND_SMS)' android/app/src/main/AndroidManifest.xml android/app/src/main 2>/dev/null; then
             echo 'Unexpected dangerous Android permission found'
             exit 1
@@ -108,6 +116,24 @@ jobs:
         run: |
           cd android
           ./gradlew assembleDebug --stacktrace
+
+      - name: Verify merged manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          MERGED_MANIFEST=$(find android/app/build/intermediates -type f -name AndroidManifest.xml -path '*debug*' | head -n 1)
+          test -n "$MERGED_MANIFEST"
+          echo "Checking $MERGED_MANIFEST"
+          grep -q 'android:allowBackup="false"' "$MERGED_MANIFEST"
+          grep -q 'android:usesCleartextTraffic="false"' "$MERGED_MANIFEST"
+          if grep -q 'android:debuggable="true"' "$MERGED_MANIFEST"; then
+            echo 'Final APK manifest is debuggable'
+            exit 1
+          fi
+          if grep -E 'android.permission.(READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|MANAGE_EXTERNAL_STORAGE|QUERY_ALL_PACKAGES|REQUEST_INSTALL_PACKAGES|SYSTEM_ALERT_WINDOW|RECORD_AUDIO|CAMERA|ACCESS_FINE_LOCATION|READ_CONTACTS|READ_SMS|SEND_SMS)' "$MERGED_MANIFEST"; then
+            echo 'Unexpected dangerous permission present in final merged manifest'
+            exit 1
+          fi
 
       - name: Scan APK contents
         shell: bash
