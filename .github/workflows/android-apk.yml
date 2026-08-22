@@ -132,10 +132,42 @@ jobs:
             echo 'Final APK manifest is debuggable'
             exit 1
           fi
-          if grep -E 'android.permission.(READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|MANAGE_EXTERNAL_STORAGE|QUERY_ALL_PACKAGES|REQUEST_INSTALL_PACKAGES|SYSTEM_ALERT_WINDOW|RECORD_AUDIO|CAMERA|ACCESS_FINE_LOCATION|READ_CONTACTS|READ_SMS|SEND_SMS)' "$MERGED_MANIFEST"; then
-            echo 'Unexpected dangerous permission present in final merged manifest'
-            exit 1
-          fi
+          python3 - "$MERGED_MANIFEST" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          manifest_path = sys.argv[1]
+          android = "{http://schemas.android.com/apk/res/android}"
+          root = ET.parse(manifest_path).getroot()
+
+          permissions = {
+              node.get(android + "name")
+              for node in root.findall("uses-permission")
+              if node.get(android + "name")
+          }
+          allowed_permissions = {"android.permission.INTERNET"}
+          unexpected_permissions = sorted(permissions - allowed_permissions)
+          if unexpected_permissions:
+              raise SystemExit(f"Unexpected Android permissions: {unexpected_permissions}")
+
+          exported = []
+          app = root.find("application")
+          if app is None:
+              raise SystemExit("Application node missing from merged manifest")
+          for tag in ("activity", "activity-alias", "service", "receiver", "provider"):
+              for node in app.findall(tag):
+                  if node.get(android + "exported") == "true":
+                      exported.append((tag, node.get(android + "name")))
+
+          if len(exported) != 1:
+              raise SystemExit(f"Unexpected exported Android components: {exported}")
+          tag, name = exported[0]
+          if tag != "activity" or not name or not name.endswith(".MainActivity"):
+              raise SystemExit(f"Unexpected exported component: {exported[0]}")
+
+          print("Permissions:", sorted(permissions))
+          print("Exported components:", exported)
+          PY
 
       - name: Scan APK contents
         shell: bash
