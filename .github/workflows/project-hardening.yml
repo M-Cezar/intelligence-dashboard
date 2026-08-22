@@ -23,15 +23,18 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
+          package-manager-cache: false
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
         with:
           version: 10.15.1
 
@@ -68,4 +71,4 @@ jobs:
           grep -q '<div id="root"></div>' /tmp/home.html
 
       - name: Dependency audit
-        run: pnpm audit --audit-level moderate
+        run: pnpm audit --audit-level low
