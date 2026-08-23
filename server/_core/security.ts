@@ -4,21 +4,36 @@ export const API_BODY_LIMIT = "1mb";
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 120;
 const AUTH_RATE_LIMIT_MAX_REQUESTS = 30;
+const RATE_BUCKET_MAX_ENTRIES = 10_000;
 
 type RateBucket = { count: number; resetAt: number };
 const rateBuckets = new Map<string, RateBucket>();
 
 function getClientKey(req: Request): string {
-  const forwarded = req.headers["x-forwarded-for"];
-  const forwardedValue = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-  const ip = forwardedValue?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+  const ip = req.socket.remoteAddress || "unknown";
   return `${ip}:${req.path.startsWith("/api/oauth") ? "auth" : "api"}`;
+}
+
+function pruneExpiredBuckets(now: number) {
+  if (rateBuckets.size < RATE_BUCKET_MAX_ENTRIES) return;
+
+  for (const [key, bucket] of rateBuckets) {
+    if (bucket.resetAt <= now) rateBuckets.delete(key);
+  }
+
+  while (rateBuckets.size >= RATE_BUCKET_MAX_ENTRIES) {
+    const oldestKey = rateBuckets.keys().next().value as string | undefined;
+    if (!oldestKey) break;
+    rateBuckets.delete(oldestKey);
+  }
 }
 
 export function apiRateLimit(req: Request, res: Response, next: NextFunction) {
   if (!req.path.startsWith("/api/")) return next();
 
   const now = Date.now();
+  pruneExpiredBuckets(now);
+
   const key = getClientKey(req);
   const maxRequests = req.path.startsWith("/api/oauth")
     ? AUTH_RATE_LIMIT_MAX_REQUESTS
