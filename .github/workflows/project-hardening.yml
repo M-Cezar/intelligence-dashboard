@@ -69,3 +69,5 @@ jobs:
 
       - name: Dependency audit
         run: pnpm audit --audit-level moderate
+
+# Touch file when a clean validation run needs to be retriggered.
