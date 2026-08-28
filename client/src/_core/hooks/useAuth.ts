@@ -41,25 +41,25 @@ export function useAuth(options?: UseAuthOptions) {
   }, [isNative, logoutMutation, utils]);
 
   const state = useMemo(() => {
-    const localUser = isNative ? { name: "Modo local", email: "local" } : null;
-    const user = meQuery.data ?? localUser;
+    const localDisplayUser = isNative ? { name: "Modo local", email: "local" } : null;
+    const user = meQuery.data ?? localDisplayUser;
 
     return {
       user,
       loading: isNative ? false : meQuery.isLoading || logoutMutation.isPending,
       error: isNative ? null : meQuery.error ?? logoutMutation.error ?? null,
-      isAuthenticated: Boolean(user),
+      isAuthenticated: isNative ? false : Boolean(meQuery.data),
     };
   }, [isNative, meQuery.data, meQuery.error, meQuery.isLoading, logoutMutation.error, logoutMutation.isPending]);
 
   useEffect(() => {
     if (isNative || !redirectOnUnauthenticated) return;
-    if (meQuery.isLoading || logoutMutation.isPending || state.user) return;
+    if (meQuery.isLoading || logoutMutation.isPending || meQuery.data) return;
     if (typeof window === "undefined") return;
     const current = `${window.location.pathname}${window.location.search}`;
     if (current === redirectPath) return;
     window.location.assign(redirectPath);
-  }, [isNative, redirectOnUnauthenticated, redirectPath, logoutMutation.isPending, meQuery.isLoading, state.user]);
+  }, [isNative, redirectOnUnauthenticated, redirectPath, logoutMutation.isPending, meQuery.data, meQuery.isLoading]);
 
   return {
     ...state,
