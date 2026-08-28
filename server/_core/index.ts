@@ -7,7 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { ENV } from "./env";
-import { API_BODY_LIMIT, apiRateLimit, securityHeaders } from "./security";
+import { API_BODY_LIMIT, apiRateLimit, apiSameOriginProtection, securityHeaders } from "./security";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -40,6 +40,7 @@ async function startServer() {
 
   app.use(securityHeaders);
   app.use(apiRateLimit);
+  app.use(apiSameOriginProtection);
   app.use(express.json({ limit: API_BODY_LIMIT }));
   app.use(express.urlencoded({ limit: API_BODY_LIMIT, extended: true }));
 

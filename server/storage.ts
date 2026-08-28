@@ -51,7 +51,13 @@ export function normalizeKey(relKey: string): string {
   if (typeof relKey !== "string") throw new Error("Storage key must be a string");
   const trimmed = relKey.trim().replace(/^\/+/, "");
   if (!trimmed || trimmed.length > 512) throw new Error("Storage key is empty or too long");
-  if (trimmed.includes("\\") || trimmed.includes("\0")) throw new Error("Storage key contains invalid characters");
+  if (trimmed.includes("\\") || trimmed.includes("\0") || trimmed.includes("%")) {
+    throw new Error("Storage key contains invalid or encoded characters");
+  }
+  for (let i = 0; i < trimmed.length; i += 1) {
+    const code = trimmed.charCodeAt(i);
+    if (code < 32 || code === 127) throw new Error("Storage key contains control characters");
+  }
 
   const segments = trimmed.split("/");
   if (segments.some(segment => !segment || segment === "." || segment === "..")) {
