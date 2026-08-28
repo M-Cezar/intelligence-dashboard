@@ -53,19 +53,12 @@ export function useAuth(options?: UseAuthOptions) {
   }, [isNative, meQuery.data, meQuery.error, meQuery.isLoading, logoutMutation.error, logoutMutation.isPending]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      localStorage.setItem("intelligence-dashboard-user", JSON.stringify(state.user));
-    } catch {
-      // Storage can be unavailable in restricted browser contexts; auth must still work.
-    }
-  }, [state.user]);
-
-  useEffect(() => {
     if (isNative || !redirectOnUnauthenticated) return;
     if (meQuery.isLoading || logoutMutation.isPending || state.user) return;
-    if (typeof window === "undefined" || window.location.pathname === redirectPath) return;
-    window.location.href = redirectPath;
+    if (typeof window === "undefined") return;
+    const current = `${window.location.pathname}${window.location.search}`;
+    if (current === redirectPath) return;
+    window.location.assign(redirectPath);
   }, [isNative, redirectOnUnauthenticated, redirectPath, logoutMutation.isPending, meQuery.isLoading, state.user]);
 
   return {
