@@ -4,9 +4,10 @@ import { SignJWT } from "jose";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SESSION_TTL_MS } from "@shared/const";
 import { normalizeKey } from "../storage";
+import { getSessionCookieOptions } from "./cookies";
 import { ENV } from "./env";
 import { registerOAuthRoutes } from "./oauth";
-import { apiRateLimit, API_BODY_LIMIT, resetRateLimitsForTests, securityHeaders } from "./security";
+import { apiRateLimit, API_BODY_LIMIT, apiSameOriginProtection, resetRateLimitsForTests, securityHeaders } from "./security";
 import { sdk } from "./sdk";
 import { adminProcedure, protectedProcedure, router } from "./trpc";
 
@@ -107,6 +108,60 @@ describe("adversarial HTTP tests", () => {
     } finally {
       await close(server);
     }
+  });
+
+  it("blocks cross-site unsafe API requests using Fetch Metadata", async () => {
+    const app = express();
+    app.use(apiSameOriginProtection);
+    app.post("/api/change", (_req, res) => res.json({ ok: true }));
+    const { server, baseUrl } = await listen(app);
+    try {
+      const response = await fetch(`${baseUrl}/api/change`, {
+        method: "POST",
+        headers: { "sec-fetch-site": "cross-site" },
+      });
+      expect(response.status).toBe(403);
+    } finally {
+      await close(server);
+    }
+  });
+
+  it("blocks a forged Origin on unsafe API requests", async () => {
+    const app = express();
+    app.use(apiSameOriginProtection);
+    app.post("/api/change", (_req, res) => res.json({ ok: true }));
+    const { server, baseUrl } = await listen(app);
+    try {
+      const response = await fetch(`${baseUrl}/api/change`, {
+        method: "POST",
+        headers: { origin: "https://attacker.example" },
+      });
+      expect(response.status).toBe(403);
+    } finally {
+      await close(server);
+    }
+  });
+
+  it("allows a same-origin unsafe API request", async () => {
+    const app = express();
+    app.use(apiSameOriginProtection);
+    app.post("/api/change", (_req, res) => res.json({ ok: true }));
+    const { server, baseUrl } = await listen(app);
+    try {
+      const response = await fetch(`${baseUrl}/api/change`, {
+        method: "POST",
+        headers: { origin: baseUrl },
+      });
+      expect(response.status).toBe(200);
+    } finally {
+      await close(server);
+    }
+  });
+
+  it("forces Secure cookies in production even when proxy metadata is missing", () => {
+    ENV.isProduction = true;
+    const options = getSessionCookieOptions({ secure: false, protocol: "http" } as any);
+    expect(options).toMatchObject({ httpOnly: true, sameSite: "lax", secure: true, path: "/" });
   });
 });
 
