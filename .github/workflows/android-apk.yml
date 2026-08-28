@@ -53,21 +53,47 @@ jobs:
       - name: Build web app
         run: pnpm run build:web
 
+      - name: Reject secret references in web bundle
+        run: |
+          if grep -R -nE 'JWT_SECRET|DATABASE_URL|BUILT_IN_FORGE_API_KEY|OWNER_OPEN_ID|VITE_FRONTEND_FORGE_API_KE[Y]' dist/public; then
+            echo "Sensitive configuration reference found in web bundle"
+            exit 1
+          fi
+
       - name: Create Android project
         run: pnpm exec cap add android
+
+      - name: Harden Android manifest
+        run: |
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          path = "android/app/src/main/AndroidManifest.xml"
+          android = "http://schemas.android.com/apk/res/android"
+          ET.register_namespace("android", android)
+          tree = ET.parse(path)
+          root = tree.getroot()
+          app = root.find("application")
+          if app is None:
+              raise SystemExit("Android application element not found")
+          app.set(f"{{{android}}}allowBackup", "false")
+          app.set(f"{{{android}}}usesCleartextTraffic", "false")
+          tree.write(path, encoding="utf-8", xml_declaration=True)
+          PY
+          grep -q 'allowBackup="false"' android/app/src/main/AndroidManifest.xml
+          grep -q 'usesCleartextTraffic="false"' android/app/src/main/AndroidManifest.xml
 
       - name: Sync Android
         run: pnpm exec cap sync android
 
-      - name: Build debug APK
+      - name: Build testing-only debug APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
-      - name: Upload APK
+      - name: Upload testing APK
         uses: actions/upload-artifact@v4
         with:
-          name: intelligence-dashboard-debug-apk
+          name: intelligence-dashboard-testing-only-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

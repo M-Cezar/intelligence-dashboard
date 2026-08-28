@@ -1,0 +1,124 @@
+name: Android Signed Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-signed-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Require signing secrets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript check
+        run: pnpm run check
+
+      - name: Tests
+        run: pnpm run test
+
+      - name: Build web app
+        run: pnpm run build:web
+
+      - name: Reject secret references in web bundle
+        run: |
+          if grep -R -nE 'JWT_SECRET|DATABASE_URL|BUILT_IN_FORGE_API_KEY|OWNER_OPEN_ID|VITE_FRONTEND_FORGE_API_KE[Y]' dist/public; then
+            echo "Sensitive configuration reference found in web bundle"
+            exit 1
+          fi
+
+      - name: Create Android project
+        run: pnpm exec cap add android
+
+      - name: Harden Android manifest
+        run: |
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          path = "android/app/src/main/AndroidManifest.xml"
+          android = "http://schemas.android.com/apk/res/android"
+          ET.register_namespace("android", android)
+          tree = ET.parse(path)
+          root = tree.getroot()
+          app = root.find("application")
+          if app is None:
+              raise SystemExit("Android application element not found")
+          app.set(f"{{{android}}}allowBackup", "false")
+          app.set(f"{{{android}}}usesCleartextTraffic", "false")
+          tree.write(path, encoding="utf-8", xml_declaration=True)
+          PY
+
+      - name: Sync Android
+        run: pnpm exec cap sync android
+
+      - name: Build unsigned release
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --stacktrace
+
+      - name: Sign and verify release APK
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > /tmp/intelligence-dashboard-release.keystore
+          UNSIGNED="android/app/build/outputs/apk/release/app-release-unsigned.apk"
+          test -f "$UNSIGNED"
+          ZIPALIGN=$(find "$ANDROID_HOME/build-tools" -type f -name zipalign | sort -V | tail -1)
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
+          test -x "$ZIPALIGN"
+          test -x "$APKSIGNER"
+          "$ZIPALIGN" -f -p 4 "$UNSIGNED" /tmp/app-release-aligned.apk
+          "$APKSIGNER" sign \
+            --ks /tmp/intelligence-dashboard-release.keystore \
+            --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
+            --key-pass env:ANDROID_KEY_PASSWORD \
+            --out /tmp/intelligence-dashboard-release.apk \
+            /tmp/app-release-aligned.apk
+          "$APKSIGNER" verify --verbose --print-certs /tmp/intelligence-dashboard-release.apk
+          rm -f /tmp/intelligence-dashboard-release.keystore
+
+      - name: Upload signed release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: intelligence-dashboard-signed-release-apk
+          path: /tmp/intelligence-dashboard-release.apk
+          if-no-files-found: error

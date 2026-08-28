@@ -108,7 +108,7 @@ export default function Home() {
           </TabsList>
           <TabsContent value="concursos"><ItemGrid items={filter(concursos)} path="concurso" /></TabsContent>
           <TabsContent value="noticias"><ItemGrid items={filter(noticias)} path="noticia" /></TabsContent>
-          <TabsContent value="ativos"><ItemGrid items={filter(ativos)} path="ativo" /></TabsContent>
+          <TabsContent value="ativos"><ItemGrid items={filter(ativos)} path="acao" /></TabsContent>
           <TabsContent value="cursos"><ItemGrid items={filter(cursos)} path="curso" /></TabsContent>
         </Tabs>
       </main>

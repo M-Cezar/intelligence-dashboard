@@ -1,5 +1,5 @@
 import { ForbiddenError } from "@shared/_core/errors";
-import { AXIOS_TIMEOUT_MS, COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { AXIOS_TIMEOUT_MS, COOKIE_NAME, SESSION_TTL_MS } from "@shared/const";
 import axios, { type AxiosInstance } from "axios";
 import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
@@ -18,6 +18,9 @@ import type {
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
 
+const LAST_SIGNED_IN_WRITE_INTERVAL_MS = 15 * 60 * 1000;
+const SESSION_ISSUER = "intelligence-dashboard";
+
 export type SessionPayload = {
   openId: string;
   appId: string;
@@ -35,11 +38,7 @@ class OAuthService {
     }
   }
 
-  private decodeState(state: string): string {
-    return Buffer.from(state, "base64").toString("utf-8");
-  }
-
-  async getTokenByCode(code: string, state: string): Promise<ExchangeTokenResponse> {
+  async getTokenByCode(code: string, redirectUri: string): Promise<ExchangeTokenResponse> {
     if (!ENV.appId) throw new Error("VITE_APP_ID is required for OAuth");
     if (!ENV.oAuthServerUrl) throw new Error("OAUTH_SERVER_URL is required for OAuth");
 
@@ -47,7 +46,7 @@ class OAuthService {
       clientId: ENV.appId,
       grantType: "authorization_code",
       code,
-      redirectUri: this.decodeState(state),
+      redirectUri,
     };
 
     const { data } = await this.client.post<ExchangeTokenResponse>(EXCHANGE_TOKEN_PATH, payload);
@@ -89,8 +88,11 @@ class SDKServer {
     return first ? first.toLowerCase() : null;
   }
 
-  async exchangeCodeForToken(code: string, state: string): Promise<ExchangeTokenResponse> {
-    return this.oauthService.getTokenByCode(code, state);
+  async exchangeCodeForToken(code: string, redirectUri: string): Promise<ExchangeTokenResponse> {
+    if (!isNonEmptyString(code) || !isNonEmptyString(redirectUri)) {
+      throw new Error("OAuth code and redirectUri are required");
+    }
+    return this.oauthService.getTokenByCode(code, redirectUri);
   }
 
   async getUserInfo(accessToken: string): Promise<GetUserInfoResponse> {
@@ -117,31 +119,44 @@ class SDKServer {
   }
 
   async signSession(payload: SessionPayload, options: { expiresInMs?: number } = {}): Promise<string> {
-    if (!isNonEmptyString(payload.openId) || !isNonEmptyString(payload.appId)) throw new Error("Session requires a valid openId and appId");
+    if (!isNonEmptyString(payload.openId) || !isNonEmptyString(payload.appId)) {
+      throw new Error("Session requires a valid openId and appId");
+    }
+
     const issuedAt = Date.now();
-    const expiresInMs = options.expiresInMs ?? ONE_YEAR_MS;
+    const expiresInMs = options.expiresInMs ?? SESSION_TTL_MS;
+    if (!Number.isFinite(expiresInMs) || expiresInMs <= 0 || expiresInMs > SESSION_TTL_MS) {
+      throw new Error("Session expiration is outside the allowed security policy");
+    }
+
     const expirationSeconds = Math.floor((issuedAt + expiresInMs) / 1000);
     const secretKey = this.getSessionSecret();
     return new SignJWT({ openId: payload.openId, appId: payload.appId, name: payload.name ?? "" })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+      .setIssuer(SESSION_ISSUER)
+      .setAudience(payload.appId)
       .setIssuedAt(Math.floor(issuedAt / 1000))
       .setExpirationTime(expirationSeconds)
       .sign(secretKey);
   }
 
   async verifySession(cookieValue: string | undefined | null): Promise<{ openId: string; appId: string; name: string } | null> {
-    if (!cookieValue) return null;
+    if (!cookieValue || !ENV.appId) return null;
     try {
       const secretKey = this.getSessionSecret();
-      const { payload } = await jwtVerify(cookieValue, secretKey, { algorithms: ["HS256"] });
+      const { payload } = await jwtVerify(cookieValue, secretKey, {
+        algorithms: ["HS256"],
+        issuer: SESSION_ISSUER,
+        audience: ENV.appId,
+      });
       const { openId, appId, name } = payload as Record<string, unknown>;
-      if (!isNonEmptyString(openId) || !isNonEmptyString(appId) || typeof name !== "string" || (ENV.appId && appId !== ENV.appId)) {
+      if (!isNonEmptyString(openId) || !isNonEmptyString(appId) || typeof name !== "string" || appId !== ENV.appId) {
         console.warn("[Auth] Invalid session payload");
         return null;
       }
       return { openId, appId, name };
-    } catch (error) {
-      console.warn("[Auth] Session verification failed", String(error));
+    } catch {
+      console.warn("[Auth] Session verification failed");
       return null;
     }
   }
@@ -158,20 +173,34 @@ class SDKServer {
     const sessionCookie = cookies.get(COOKIE_NAME);
     const session = await this.verifySession(sessionCookie);
     if (!session) throw ForbiddenError("Invalid session cookie");
+
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(session.openId);
     if (!user) {
       try {
         const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
-        await db.upsertUser({ openId: userInfo.openId, name: userInfo.name || null, email: userInfo.email ?? null, loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null, lastSignedIn: signedInAt });
+        if (userInfo.openId !== session.openId) throw new Error("OAuth identity does not match session identity");
+        await db.upsertUser({
+          openId: userInfo.openId,
+          name: userInfo.name || null,
+          email: userInfo.email ?? null,
+          loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
+          lastSignedIn: signedInAt,
+        });
         user = await db.getUserByOpenId(userInfo.openId);
       } catch (error) {
-        console.error("[Auth] Failed to sync user from OAuth:", error);
+        console.error("[Auth] Failed to sync user from OAuth:", error instanceof Error ? error.message : "unknown error");
         throw ForbiddenError("Failed to sync user info");
       }
     }
+
     if (!user) throw ForbiddenError("User not found");
-    await db.upsertUser({ openId: user.openId, lastSignedIn: signedInAt });
+
+    const lastSignedIn = user.lastSignedIn instanceof Date ? user.lastSignedIn.getTime() : new Date(user.lastSignedIn).getTime();
+    if (!Number.isFinite(lastSignedIn) || Date.now() - lastSignedIn >= LAST_SIGNED_IN_WRITE_INTERVAL_MS) {
+      await db.upsertUser({ openId: user.openId, lastSignedIn: signedInAt });
+    }
+
     return user;
   }
 }
