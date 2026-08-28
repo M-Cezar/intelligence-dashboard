@@ -17,9 +17,9 @@ function getClientKey(req: Request): string {
 function pruneExpiredBuckets(now: number) {
   if (rateBuckets.size < RATE_BUCKET_MAX_ENTRIES) return;
 
-  for (const [key, bucket] of rateBuckets) {
+  rateBuckets.forEach((bucket, key) => {
     if (bucket.resetAt <= now) rateBuckets.delete(key);
-  }
+  });
 
   while (rateBuckets.size >= RATE_BUCKET_MAX_ENTRIES) {
     const oldestKey = rateBuckets.keys().next().value as string | undefined;
