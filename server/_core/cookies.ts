@@ -1,9 +1,10 @@
 import type { CookieOptions, Request } from "express";
+import { ENV } from "./env";
 
 export function getSessionCookieOptions(
   req: Request
 ): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
-  const secure = req.secure === true || req.protocol === "https";
+  const secure = ENV.isProduction || req.secure === true || req.protocol === "https";
 
   return {
     httpOnly: true,
