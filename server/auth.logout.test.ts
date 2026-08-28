@@ -21,24 +21,24 @@ function createAuthContext(protocol: "http" | "https" = "https"): { ctx: TrpcCon
   };
   const ctx: TrpcContext = {
     user,
-    req: { protocol, headers: {} } as TrpcContext["req"],
+    req: { protocol, secure: protocol === "https", headers: {} } as TrpcContext["req"],
     res: { clearCookie: (name: string, options: Record<string, unknown>) => clearedCookies.push({ name, options }) } as TrpcContext["res"],
   };
   return { ctx, clearedCookies };
 }
 
 describe("auth.logout", () => {
-  it("clears a secure session cookie correctly on HTTPS", async () => {
+  it("clears a secure SameSite=Lax session cookie on HTTPS", async () => {
     const { ctx, clearedCookies } = createAuthContext("https");
     const caller = appRouter.createCaller(ctx);
     const result = await caller.auth.logout();
     expect(result).toEqual({ success: true });
     expect(clearedCookies).toHaveLength(1);
     expect(clearedCookies[0]?.name).toBe(COOKIE_NAME);
-    expect(clearedCookies[0]?.options).toMatchObject({ maxAge: -1, secure: true, sameSite: "none", httpOnly: true, path: "/" });
+    expect(clearedCookies[0]?.options).toMatchObject({ maxAge: -1, secure: true, sameSite: "lax", httpOnly: true, path: "/" });
   });
 
-  it("uses a browser-compatible cookie policy on local HTTP", async () => {
+  it("uses the same CSRF-resistant cookie policy on local HTTP without Secure", async () => {
     const { ctx, clearedCookies } = createAuthContext("http");
     const caller = appRouter.createCaller(ctx);
     await caller.auth.logout();
