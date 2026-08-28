@@ -6,6 +6,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import { ENV } from "./env";
 import { API_BODY_LIMIT, apiRateLimit, securityHeaders } from "./security";
 import { serveStatic, setupVite } from "./vite";
 
@@ -33,6 +34,10 @@ async function startServer() {
   const server = createServer(app);
 
   app.disable("x-powered-by");
+  if (ENV.trustProxyHops > 0) {
+    app.set("trust proxy", ENV.trustProxyHops);
+  }
+
   app.use(securityHeaders);
   app.use(apiRateLimit);
   app.use(express.json({ limit: API_BODY_LIMIT }));
@@ -61,9 +66,12 @@ async function startServer() {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
   }
 
-  server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
+  server.listen(port, "0.0.0.0", () => {
+    console.log(`Server running on port ${port}`);
   });
 }
 
-startServer().catch(console.error);
+startServer().catch(error => {
+  console.error("Server failed to start", error instanceof Error ? error.message : "unknown error");
+  process.exitCode = 1;
+});
