@@ -1,10 +1,12 @@
 import type { NextFunction, Request, Response } from "express";
+import { ENV } from "./env";
 
 export const API_BODY_LIMIT = "1mb";
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 120;
 const AUTH_RATE_LIMIT_MAX_REQUESTS = 30;
 const RATE_BUCKET_MAX_ENTRIES = 10_000;
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 type RateBucket = { count: number; resetAt: number };
 const rateBuckets = new Map<string, RateBucket>();
@@ -26,6 +28,44 @@ function pruneExpiredBuckets(now: number) {
     if (!oldestKey) break;
     rateBuckets.delete(oldestKey);
   }
+}
+
+function expectedOrigin(req: Request): string | null {
+  try {
+    if (ENV.appBaseUrl) return new URL(ENV.appBaseUrl).origin;
+    const host = req.get("host");
+    if (!host) return null;
+    return `${req.protocol}://${host}`;
+  } catch {
+    return null;
+  }
+}
+
+export function apiSameOriginProtection(req: Request, res: Response, next: NextFunction) {
+  if (!req.path.startsWith("/api/") || SAFE_METHODS.has(req.method.toUpperCase())) return next();
+
+  const fetchSite = req.get("sec-fetch-site")?.toLowerCase();
+  if (fetchSite === "cross-site") {
+    res.status(403).json({ error: "Cross-site API request blocked" });
+    return;
+  }
+
+  const originHeader = req.get("origin");
+  if (!originHeader) return next();
+
+  const allowedOrigin = expectedOrigin(req);
+  try {
+    const origin = new URL(originHeader).origin;
+    if (!allowedOrigin || origin !== allowedOrigin) {
+      res.status(403).json({ error: "Cross-origin API request blocked" });
+      return;
+    }
+  } catch {
+    res.status(403).json({ error: "Invalid Origin header" });
+    return;
+  }
+
+  next();
 }
 
 export function apiRateLimit(req: Request, res: Response, next: NextFunction) {
