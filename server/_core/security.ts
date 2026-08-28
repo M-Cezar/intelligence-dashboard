@@ -10,7 +10,7 @@ type RateBucket = { count: number; resetAt: number };
 const rateBuckets = new Map<string, RateBucket>();
 
 function getClientKey(req: Request): string {
-  const ip = req.socket.remoteAddress || "unknown";
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
   return `${ip}:${req.path.startsWith("/api/oauth") ? "auth" : "api"}`;
 }
 
@@ -60,13 +60,15 @@ export function apiRateLimit(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-export function securityHeaders(_req: Request, res: Response, next: NextFunction) {
+export function securityHeaders(req: Request, res: Response, next: NextFunction) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
-  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("X-DNS-Prefetch-Control", "off");
+  res.setHeader("Referrer-Policy", "no-referrer");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(self)");
   res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
   res.setHeader("Cross-Origin-Resource-Policy", "same-site");
+  res.setHeader("Origin-Agent-Cluster", "?1");
   res.setHeader(
     "Content-Security-Policy",
     [
@@ -79,11 +81,18 @@ export function securityHeaders(_req: Request, res: Response, next: NextFunction
       "font-src 'self' https://fonts.gstatic.com data:",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "script-src 'self' https://maps.googleapis.com https://maps.gstatic.com",
-      "connect-src 'self' https:",
+      "connect-src 'self' https://maps.googleapis.com https://maps.gstatic.com",
+      "upgrade-insecure-requests",
     ].join("; ")
   );
+
+  if (req.path.startsWith("/api/")) {
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Pragma", "no-cache");
+  }
+
   if (process.env.NODE_ENV === "production") {
-    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
   }
   next();
 }
