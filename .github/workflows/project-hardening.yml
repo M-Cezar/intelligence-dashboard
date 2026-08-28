@@ -44,7 +44,7 @@ jobs:
 
       - name: Reject frontend secret-like environment variables
         run: |
-          if git grep -nE 'VITE_[A-Z0-9_]*(SECRET|TOKEN|PRIVATE_KEY)|VITE_FRONTEND_FORGE_API_KEY' -- ':!pnpm-lock.yaml'; then
+          if git grep -nE 'VITE_[A-Z0-9_]*(SECRET|TOKEN|PRIVATE_KEY)|VITE_FRONTEND_FORGE_API_KE[Y]' -- ':!pnpm-lock.yaml'; then
             echo "Potential secret configured for frontend exposure"
             exit 1
           fi
