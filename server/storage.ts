@@ -54,7 +54,10 @@ export function normalizeKey(relKey: string): string {
   if (trimmed.includes("\\") || trimmed.includes("\0") || trimmed.includes("%")) {
     throw new Error("Storage key contains invalid or encoded characters");
   }
-  if (/\p{Cc}/u.test(trimmed)) throw new Error("Storage key contains control characters");
+  for (let i = 0; i < trimmed.length; i += 1) {
+    const code = trimmed.charCodeAt(i);
+    if (code < 32 || code === 127) throw new Error("Storage key contains control characters");
+  }
 
   const segments = trimmed.split("/");
   if (segments.some(segment => !segment || segment === "." || segment === "..")) {
